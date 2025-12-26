@@ -7,6 +7,7 @@ import {
   AccordionDetails,
   AccordionSummary,
   Box,
+  Button,
   Card,
   CardContent,
   Typography,
@@ -16,6 +17,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Grid from "@mui/material/Grid";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
+import Link from "next/link";
 
 type BookRow = {
   id: string;
@@ -117,7 +119,11 @@ export default function HomePage() {
             pb: { md: 1 },
           }}
         >
-          <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography
+            variant="subtitle1"
+            component="h2"
+            sx={{ fontWeight: 700, mb: 0.5 }}
+          >
             {rankLabel(rankIndex)}
           </Typography>
 
@@ -148,39 +154,47 @@ export default function HomePage() {
       </Box>
     );
   }
-function renderMobileDetails(m: { email: string; name: string }) {
-  const bucket = byEmail[m.email] ?? { completed: [] };
-  const currentTitle = bucket.current?.title?.trim() || "—";
 
-  return (
-    <>
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="overline">Current book</Typography>
-          <Typography variant="h6" component="h3">
-            {currentTitle}
-          </Typography>
-        </CardContent>
-      </Card>
+  function renderMobileDetails(m: { email: string; name: string }) {
+    const bucket = byEmail[m.email] ?? { completed: [] };
+    const currentTitle = bucket.current?.title?.trim() || "—";
 
-      {bucket.completed.map((b) => (
-        <Card key={b.id} sx={{ mb: 1 }}>
+    return (
+      <>
+        <Card sx={{ mb: 2 }}>
           <CardContent>
+            <Typography variant="overline">Current book</Typography>
             <Typography variant="h6" component="h3">
-              {b.title || "—"}
+              {currentTitle}
             </Typography>
           </CardContent>
         </Card>
-      ))}
-    </>
-  );
-}
+
+        {bucket.completed.map((b) => (
+          <Card key={b.id} sx={{ mb: 1 }}>
+            <CardContent>
+              <Typography variant="h6" component="h3">
+                {b.title || "—"}
+              </Typography>
+            </CardContent>
+          </Card>
+        ))}
+      </>
+    );
+  }
 
   return (
     <>
       <Typography variant="h3" component="h1" gutterBottom>
         2026 Book Club Bros
       </Typography>
+
+      {/* Login button (top-right) */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+        <Button component={Link} href="/login" variant="outlined">
+          Log in
+        </Button>
+      </Box>
 
       {/* MOBILE: accordions */}
       {isMobile && (
@@ -211,7 +225,11 @@ function renderMobileDetails(m: { email: string; name: string }) {
                   }}
                 >
                   <Box sx={{ width: "100%" }}>
-                    <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>
+                    <Typography
+                      variant="subtitle1"
+                      component="h2"
+                      sx={{ fontWeight: 700 }}
+                    >
                       {rankLabel(rankIndex)}
                     </Typography>
                     <Typography variant="h6" component="h2">
@@ -223,9 +241,7 @@ function renderMobileDetails(m: { email: string; name: string }) {
                   </Box>
                 </AccordionSummary>
 
-                <AccordionDetails>
-                  {renderMobileDetails(m)}
-                </AccordionDetails>
+                <AccordionDetails>{renderMobileDetails(m)}</AccordionDetails>
               </Accordion>
             );
           })}
