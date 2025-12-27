@@ -216,17 +216,6 @@ export default function HomePage() {
 
   return (
     <>
-      <MobileNav />
-
-      <Typography variant="h3" component="h1" gutterBottom>
-        Book Bros Book Club 2026
-      </Typography>
-
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-        <Button component={Link} href="/admin/login" variant="outlined">
-          Log in
-        </Button>
-      </Box>
 
       {isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>

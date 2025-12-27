@@ -13,10 +13,10 @@ export default function SiteHeader() {
         <Typography
           component={Link}
           href="/"
-          variant="h6"
+          variant="h5"
           sx={{ textDecoration: "none", color: "inherit", fontWeight: 700 }}
         >
-          Book Club Bros
+          Book Bros Book Club 2026
         </Typography>
 
         <Box sx={{ flex: 1 }} />
