@@ -219,7 +219,7 @@ export default function HomePage() {
       <MobileNav />
 
       <Typography variant="h3" component="h1" gutterBottom>
-        2026 Book Club Bros
+        Book Bros Book Club 2026
       </Typography>
 
       <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>

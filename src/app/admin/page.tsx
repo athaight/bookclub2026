@@ -514,7 +514,7 @@ export default function AdminPage() {
 
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
         <Typography variant="h3" component="h1">
-          2026 Book Club Bros
+          Book Bros Book Club 2026
         </Typography>
         <Box sx={{ flex: 1 }} />
         <Button variant="outlined" onClick={logout}>

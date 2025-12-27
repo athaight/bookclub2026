@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
   return (
     <Box sx={{ maxWidth: 420, mx: "auto", mt: 6 }}>
       <Typography variant="h4" component="h1" gutterBottom>
-        Admin Login
+        BBBC Bro Login
       </Typography>
 
       <Card>
