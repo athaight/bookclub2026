@@ -191,7 +191,7 @@ export default function HomePage() {
 
       {/* Login button (top-right) */}
       <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-        <Button component={Link} href="/login" variant="outlined">
+        <Button component={Link} href="/admin/login" variant="outlined">
           Log in
         </Button>
       </Box>
