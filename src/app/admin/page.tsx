@@ -185,17 +185,7 @@ export default function HomePage() {
 
   return (
     <>
-      <Typography variant="h3" component="h1" gutterBottom>
-        2026 Book Club Bros
-      </Typography>
-
-      {/* Login button (top-right) */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-        <Button component={Link} href="/login" variant="outlined">
-          Log in
-        </Button>
-      </Box>
-
+     
       {/* MOBILE: accordions */}
       {isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
