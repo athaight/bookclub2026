@@ -1,7 +1,7 @@
-// src/app/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Accordion,
   AccordionDetails,
@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   CardContent,
+  Collapse,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -17,30 +18,79 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Grid from "@mui/material/Grid";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
-import Link from "next/link";
+import MobileNav from "@/components/MobileNav";
 
 type BookRow = {
   id: string;
   member_email: string;
   status: "current" | "completed";
   title: string;
+  author: string;
+  comment: string;
   created_at: string;
   completed_at: string | null;
 };
 
 type Bucket = { current?: BookRow; completed: BookRow[] };
 
+function rankLabel(rankIndex: number) {
+  if (rankIndex === 0) return "Bibliophile";
+  if (rankIndex === 1) return "Bookworm";
+  return "Can read gud";
+}
+
+function formatBookLine(title: string, author: string) {
+  const t = title?.trim();
+  const a = author?.trim();
+  if (!t && !a) return "—";
+  if (t && !a) return t;
+  if (!t && a) return a;
+  return `${t} — ${a}`;
+}
+
+function BookCard({ row }: { row: BookRow }) {
+  const [open, setOpen] = useState(false);
+  const hasComment = !!row.comment?.trim();
+
+  return (
+    <Card sx={{ mb: 1 }}>
+      <CardContent sx={{ pb: 1.5 }}>
+        <Typography variant="h6" component="h3">
+          {row.title?.trim() || "—"}
+        </Typography>
+        <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          {row.author?.trim() || "—"}
+        </Typography>
+
+        {hasComment && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+              <Button size="small" onClick={() => setOpen((v) => !v)}>
+                {open ? "See less" : "See more"}
+              </Button>
+            </Box>
+
+            <Collapse in={open}>
+              <Typography variant="body2" sx={{ fontStyle: "italic", mt: 1 }}>
+                {row.comment.trim()}
+              </Typography>
+            </Collapse>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function HomePage() {
   const members = useMemo(() => getMembers(), []);
-  const isMobile = useMediaQuery("(max-width:899px)"); // < md
+  const isMobile = useMediaQuery("(max-width:899px)");
 
   const [rows, setRows] = useState<BookRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
-
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // expanded by default (mobile)
     const init: Record<string, boolean> = {};
     for (const m of members) init[m.email] = true;
     setExpanded(init);
@@ -90,66 +140,48 @@ export default function HomePage() {
     }))
     .sort((a, b) => b.completedCount - a.completedCount);
 
-  // Desktop layout needs leader in center: [2nd, 1st, 3rd]
-  const orderedForDesktop =
-    scored.length === 3 ? [scored[1], scored[0], scored[2]] : scored;
-
-  // Mobile: show rank order top-to-bottom: [1st, 2nd, 3rd]
+  const orderedForDesktop = scored.length === 3 ? [scored[1], scored[0], scored[2]] : scored;
   const orderedForMobile = scored;
 
-  function rankLabel(rankIndex: number) {
-    if (rankIndex === 0) return "1 Bibliophile";
-    if (rankIndex === 1) return "2 Bookworm";
-    return "3 Can read gud";
-  }
-
-  function renderColumn(m: { email: string; name: string }, rankIndex: number) {
+  function renderDesktopColumn(m: { email: string; name: string }, rankIndex: number) {
     const bucket = byEmail[m.email] ?? { completed: [] };
-    const currentTitle = bucket.current?.title?.trim() || "—";
+    const current = bucket.current;
 
     return (
       <Box>
-        {/* Sticky header for desktop (page scrolls, not column scroll) */}
+        <Typography
+          variant="h5"
+          component="h2"
+          sx={{ fontWeight: 800, mt: 3, mb: 1 }}
+        >
+          {rankLabel(rankIndex)}
+        </Typography>
+
         <Box
           sx={{
-            position: { xs: "static", md: "sticky" },
-            top: { md: 8 },
-            zIndex: { md: 5 },
-            backgroundColor: { md: "background.default" },
-            pb: { md: 1 },
+            position: "sticky",
+            top: 8,
+            zIndex: 5,
+            backgroundColor: "background.default",
+            pb: 1,
           }}
         >
-          <Typography
-            variant="subtitle1"
-            component="h2"
-            sx={{ fontWeight: 700, mb: 0.5 }}
-          >
-            {rankLabel(rankIndex)}
-          </Typography>
-
-          <Typography variant="h5" component="h2" sx={{ mb: 1 }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 1 }}>
             {m.name}
           </Typography>
 
           <Card sx={{ mb: 2 }}>
             <CardContent>
               <Typography variant="overline">Current book</Typography>
-              <Typography variant="h6" component="h3">
-                {currentTitle}
+              <Typography variant="body1" sx={{ mt: 0.5 }}>
+                {current ? formatBookLine(current.title, current.author) : "—"}
               </Typography>
             </CardContent>
           </Card>
         </Box>
 
-        {/* Completed list (normal flow; whole page scrolls) */}
         {bucket.completed.map((b) => (
-          <Card key={b.id} sx={{ mb: 1 }}>
-            <CardContent>
-              <Typography variant="h6" component="h3">
-                {b.title || "—"}
-              </Typography>
-            </CardContent>
-          </Card>
+          <BookCard key={b.id} row={b} />
         ))}
       </Box>
     );
@@ -157,27 +189,26 @@ export default function HomePage() {
 
   function renderMobileDetails(m: { email: string; name: string }) {
     const bucket = byEmail[m.email] ?? { completed: [] };
-    const currentTitle = bucket.current?.title?.trim() || "—";
+    const current = bucket.current;
 
     return (
       <>
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="overline">Current book</Typography>
-            <Typography variant="h6" component="h3">
-              {currentTitle}
+            <Typography variant="body1" sx={{ mt: 0.5 }}>
+              {current ? formatBookLine(current.title, current.author) : "—"}
             </Typography>
+            {current?.comment?.trim() && (
+              <Typography variant="body2" sx={{ fontStyle: "italic", mt: 1 }}>
+                {current.comment.trim()}
+              </Typography>
+            )}
           </CardContent>
         </Card>
 
         {bucket.completed.map((b) => (
-          <Card key={b.id} sx={{ mb: 1 }}>
-            <CardContent>
-              <Typography variant="h6" component="h3">
-                {b.title || "—"}
-              </Typography>
-            </CardContent>
-          </Card>
+          <BookCard key={b.id} row={b} />
         ))}
       </>
     );
@@ -185,23 +216,24 @@ export default function HomePage() {
 
   return (
     <>
+      <MobileNav />
+
       <Typography variant="h3" component="h1" gutterBottom>
         2026 Book Club Bros
       </Typography>
 
-      {/* Login button (top-right) */}
       <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
         <Button component={Link} href="/admin/login" variant="outlined">
           Log in
         </Button>
       </Box>
 
-      {/* MOBILE: accordions */}
       {isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {orderedForMobile.map((m, rankIndex) => {
             const bucket = byEmail[m.email] ?? { completed: [] };
-            const currentTitle = bucket.current?.title?.trim() || "—";
+            const current = bucket.current;
+            const currentLine = current ? formatBookLine(current.title, current.author) : "—";
             const isExpanded = !!expanded[m.email];
 
             return (
@@ -225,18 +257,14 @@ export default function HomePage() {
                   }}
                 >
                   <Box sx={{ width: "100%" }}>
-                    <Typography
-                      variant="subtitle1"
-                      component="h2"
-                      sx={{ fontWeight: 700 }}
-                    >
+                    <Typography variant="h6" component="h2" sx={{ fontWeight: 800 }}>
                       {rankLabel(rankIndex)}
                     </Typography>
-                    <Typography variant="h6" component="h2">
+                    <Typography variant="subtitle1" component="h2">
                       {m.name}
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                      Current: {currentTitle}
+                      Current: {currentLine}
                     </Typography>
                   </Box>
                 </AccordionSummary>
@@ -248,15 +276,13 @@ export default function HomePage() {
         </Box>
       )}
 
-      {/* DESKTOP: 3 columns, page scroll */}
       {!isMobile && (
         <Grid container spacing={2}>
           {orderedForDesktop.map((m) => {
-            // rankIndex based on scored order (1st/2nd/3rd)
             const rankIndex = scored.findIndex((s) => s.email === m.email);
             return (
               <Grid key={m.email} size={{ xs: 12, md: 4 }}>
-                {renderColumn(m, rankIndex)}
+                {renderDesktopColumn(m, rankIndex)}
               </Grid>
             );
           })}

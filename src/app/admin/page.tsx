@@ -1,4 +1,3 @@
-// src/app/admin/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -11,6 +10,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -24,21 +24,91 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Grid from "@mui/material/Grid";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
+import MobileNav from "@/components/MobileNav";
 
 type BookRow = {
   id: string;
   member_email: string;
   status: "current" | "completed";
   title: string;
+  author: string;
+  comment: string;
   created_at: string;
   completed_at: string | null;
 };
 
 type Bucket = { current?: BookRow; completed: BookRow[] };
 
+function rankLabel(rankIndex: number) {
+  if (rankIndex === 0) return "Bibliophile";
+  if (rankIndex === 1) return "Bookworm";
+  return "Can read gud";
+}
+
+function formatBookLine(title: string, author: string) {
+  const t = title?.trim();
+  const a = author?.trim();
+  if (!t && !a) return "—";
+  if (t && !a) return t;
+  if (!t && a) return a;
+  return `${t} — ${a}`;
+}
+
+function ReadBookCard({
+  row,
+  showDelete,
+  onDelete,
+}: {
+  row: BookRow;
+  showDelete: boolean;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasComment = !!row.comment?.trim();
+
+  return (
+    <Card sx={{ mb: 1 }}>
+      <CardContent sx={{ pb: 1.5 }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" component="h3">
+              {row.title?.trim() || "—"}
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+              {row.author?.trim() || "—"}
+            </Typography>
+          </Box>
+
+          {showDelete && (
+            <Button variant="text" color="error" onClick={onDelete}>
+              Delete
+            </Button>
+          )}
+        </Box>
+
+        {hasComment && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+              <Button size="small" onClick={() => setOpen((v) => !v)}>
+                {open ? "See less" : "See more"}
+              </Button>
+            </Box>
+
+            <Collapse in={open}>
+              <Typography variant="body2" sx={{ fontStyle: "italic", mt: 1 }}>
+                {row.comment.trim()}
+              </Typography>
+            </Collapse>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminPage() {
   const members = useMemo(() => getMembers(), []);
-  const isMobile = useMediaQuery("(max-width:899px)"); // < md
+  const isMobile = useMediaQuery("(max-width:899px)");
 
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [rows, setRows] = useState<BookRow[]>([]);
@@ -46,12 +116,12 @@ export default function AdminPage() {
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // edit state
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
+  const [draftAuthor, setDraftAuthor] = useState("");
+  const [draftComment, setDraftComment] = useState("");
   const [markComplete, setMarkComplete] = useState(false);
 
-  // delete confirm
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -120,22 +190,22 @@ export default function AdminPage() {
       .sort((a, b) => b.completedCount - a.completedCount);
   }, [members, byEmail]);
 
-  // Desktop layout needs leader in center: [2nd, 1st, 3rd]
   const orderedForDesktop = useMemo(() => {
     if (scored.length !== 3) return scored;
     return [scored[1], scored[0], scored[2]];
   }, [scored]);
 
-  // Mobile: rank order top-to-bottom
   const orderedForMobile = scored;
 
   const myBucket = sessionEmail ? byEmail[sessionEmail] : undefined;
   const myCurrent = myBucket?.current;
 
-  function rankLabel(rankIndex: number) {
-    if (rankIndex === 0) return "1 Bibliophile";
-    if (rankIndex === 1) return "2 Bookworm";
-    return "3 Can read gud";
+  function startEdit(current?: BookRow) {
+    setEditing(true);
+    setDraftTitle(current?.title ?? "");
+    setDraftAuthor(current?.author ?? "");
+    setDraftComment(current?.comment ?? "");
+    setMarkComplete(false);
   }
 
   async function saveCurrent() {
@@ -144,13 +214,24 @@ export default function AdminPage() {
     setErr(null);
 
     if (!myCurrent) {
-      setErr("No current row found for your user. Seed a current row in Supabase.");
+      setErr("No current row found for your user.");
       return;
     }
 
     const title = draftTitle.trim();
+    const author = draftAuthor.trim();
+    const comment = draftComment.trim();
+
     if (!title) {
-      setErr("Enter a book name.");
+      setErr("Enter a title.");
+      return;
+    }
+    if (!author) {
+      setErr("Enter an author.");
+      return;
+    }
+    if (comment.length > 200) {
+      setErr("Comment must be 200 characters or less.");
       return;
     }
 
@@ -159,7 +240,7 @@ export default function AdminPage() {
     if (markComplete) {
       const { data: completedRow, error: completeErr } = await supabase
         .from("books")
-        .update({ title, status: "completed", completed_at: nowIso })
+        .update({ title, author, comment, status: "completed", completed_at: nowIso })
         .eq("id", myCurrent.id)
         .select("*")
         .single();
@@ -171,7 +252,7 @@ export default function AdminPage() {
 
       const { data: newCurrentRow, error: newCurrentErr } = await supabase
         .from("books")
-        .insert([{ member_email: sessionEmail, status: "current", title: "" }])
+        .insert([{ member_email: sessionEmail, status: "current", title: "", author: "", comment: "" }])
         .select("*")
         .single();
 
@@ -187,13 +268,15 @@ export default function AdminPage() {
 
       setEditing(false);
       setDraftTitle("");
+      setDraftAuthor("");
+      setDraftComment("");
       setMarkComplete(false);
       return;
     }
 
     const { data: updatedCurrent, error: updErr } = await supabase
       .from("books")
-      .update({ title })
+      .update({ title, author, comment })
       .eq("id", myCurrent.id)
       .select("*")
       .single();
@@ -223,28 +306,27 @@ export default function AdminPage() {
     window.location.href = "/admin/login";
   }
 
-  function renderColumn(m: { email: string; name: string }, rankIndex: number) {
+  function renderDesktopColumn(m: { email: string; name: string }, rankIndex: number) {
     const bucket = byEmail[m.email] ?? { completed: [] };
-    const currentTitle = bucket.current?.title?.trim() || "—";
+    const current = bucket.current;
     const isMe = sessionEmail && m.email === sessionEmail;
 
     return (
       <Box>
-        {/* Sticky header for desktop (page scroll) */}
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mt: 3, mb: 1 }}>
+          {rankLabel(rankIndex)}
+        </Typography>
+
         <Box
           sx={{
-            position: { xs: "static", md: "sticky" },
-            top: { md: 8 },
-            zIndex: { md: 5 },
-            backgroundColor: { md: "background.default" },
-            pb: { md: 1 },
+            position: "sticky",
+            top: 8,
+            zIndex: 5,
+            backgroundColor: "background.default",
+            pb: 1,
           }}
         >
-          <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700, mb: 0.5 }}>
-            {rankLabel(rankIndex)}
-          </Typography>
-
-          <Typography variant="h5" component="h2" sx={{ mb: 1 }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 1 }}>
             {m.name}
           </Typography>
 
@@ -253,17 +335,51 @@ export default function AdminPage() {
               <Typography variant="overline">Current book</Typography>
 
               {!isMe || !editing ? (
-                <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
-                  {currentTitle}
-                </Typography>
+                <>
+                  <Typography variant="body1" sx={{ mt: 0.5 }}>
+                    {current ? formatBookLine(current.title, current.author) : "—"}
+                  </Typography>
+
+                  {current?.comment?.trim() && (
+                    <Typography variant="body2" sx={{ fontStyle: "italic", mt: 1 }}>
+                      {current.comment.trim()}
+                    </Typography>
+                  )}
+
+                  {isMe && (
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                      <Button variant="outlined" onClick={() => startEdit(current)}>
+                        Edit
+                      </Button>
+                    </Box>
+                  )}
+                </>
               ) : (
                 <>
                   <TextField
-                    label="Current book"
+                    label="Title"
                     value={draftTitle}
                     onChange={(e) => setDraftTitle(e.target.value)}
                     fullWidth
                     sx={{ mt: 1, mb: 1 }}
+                  />
+                  <TextField
+                    label="Author"
+                    value={draftAuthor}
+                    onChange={(e) => setDraftAuthor(e.target.value)}
+                    fullWidth
+                    sx={{ mb: 1 }}
+                  />
+                  <TextField
+                    label="Why are you reading this?"
+                    value={draftComment}
+                    onChange={(e) => setDraftComment(e.target.value)}
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    inputProps={{ maxLength: 200 }}
+                    helperText={`${draftComment.trim().length}/200`}
+                    sx={{ mb: 1 }}
                   />
 
                   <FormControlLabel
@@ -271,136 +387,131 @@ export default function AdminPage() {
                       <Checkbox
                         checked={markComplete}
                         onChange={(e) => setMarkComplete(e.target.checked)}
-                        disabled={!bucket.current?.title?.trim()}
+                        disabled={!current?.title?.trim() || !current?.author?.trim()}
                       />
                     }
                     label="Mark current as completed"
                   />
+
+                  <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                    <Button variant="contained" onClick={saveCurrent}>
+                      Save
+                    </Button>
+                  </Box>
                 </>
-              )}
-
-              {isMe && !editing && (
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setEditing(true);
-                    setDraftTitle(bucket.current?.title ?? "");
-                    setMarkComplete(false);
-                  }}
-                >
-                  Edit
-                </Button>
-              )}
-
-              {isMe && editing && (
-                <Button variant="contained" onClick={saveCurrent}>
-                  Save
-                </Button>
               )}
             </CardContent>
           </Card>
         </Box>
 
-        {/* Completed list (page scrolls) */}
         {bucket.completed.map((b) => (
-          <Card key={b.id} sx={{ mb: 1 }}>
-            <CardContent sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography variant="h6" component="h3" sx={{ flex: 1 }}>
-                {b.title || "—"}
-              </Typography>
-
-              {isMe && (
-                <Button variant="text" color="error" onClick={() => setDeleteId(b.id)}>
-                  Delete
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          <ReadBookCard
+            key={b.id}
+            row={b}
+            showDelete={!!isMe}
+            onDelete={() => setDeleteId(b.id)}
+          />
         ))}
       </Box>
     );
   }
-function renderMobileDetails(m: { email: string; name: string }, rankIndex: number) {
-  const bucket = byEmail[m.email] ?? { completed: [] };
-  const currentTitle = bucket.current?.title?.trim() || "—";
-  const isMe = sessionEmail && m.email === sessionEmail;
 
-  return (
-    <>
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="overline">Current book</Typography>
+  function renderMobileDetails(m: { email: string; name: string }) {
+    const bucket = byEmail[m.email] ?? { completed: [] };
+    const current = bucket.current;
+    const isMe = sessionEmail && m.email === sessionEmail;
 
-          {!isMe || !editing ? (
-            <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
-              {currentTitle}
-            </Typography>
-          ) : (
-            <>
-              <TextField
-                label="Current book"
-                value={draftTitle}
-                onChange={(e) => setDraftTitle(e.target.value)}
-                fullWidth
-                sx={{ mt: 1, mb: 1 }}
-              />
+    return (
+      <>
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Typography variant="overline">Current book</Typography>
 
-              {/* checkbox only appears while editing, so new current book can’t be marked read until you hit Edit */}
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={markComplete}
-                    onChange={(e) => setMarkComplete(e.target.checked)}
-                    disabled={!bucket.current?.title?.trim()}
-                  />
-                }
-                label="Mark current as completed"
-              />
-            </>
-          )}
+            {!isMe || !editing ? (
+              <>
+                <Typography variant="body1" sx={{ mt: 0.5 }}>
+                  {current ? formatBookLine(current.title, current.author) : "—"}
+                </Typography>
 
-          {isMe && !editing && (
-            <Button
-              variant="outlined"
-              onClick={() => {
-                setEditing(true);
-                setDraftTitle(bucket.current?.title ?? "");
-                setMarkComplete(false);
-              }}
-            >
-              Edit
-            </Button>
-          )}
+                {current?.comment?.trim() && (
+                  <Typography variant="body2" sx={{ fontStyle: "italic", mt: 1 }}>
+                    {current.comment.trim()}
+                  </Typography>
+                )}
 
-          {isMe && editing && (
-            <Button variant="contained" onClick={saveCurrent}>
-              Save
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+                {isMe && (
+                  <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                    <Button variant="outlined" onClick={() => startEdit(current)}>
+                      Edit
+                    </Button>
+                  </Box>
+                )}
+              </>
+            ) : (
+              <>
+                <TextField
+                  label="Title"
+                  value={draftTitle}
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                  fullWidth
+                  sx={{ mt: 1, mb: 1 }}
+                />
+                <TextField
+                  label="Author"
+                  value={draftAuthor}
+                  onChange={(e) => setDraftAuthor(e.target.value)}
+                  fullWidth
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  label="Why are you reading this?"
+                  value={draftComment}
+                  onChange={(e) => setDraftComment(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  inputProps={{ maxLength: 200 }}
+                  helperText={`${draftComment.trim().length}/200`}
+                  sx={{ mb: 1 }}
+                />
 
-      {bucket.completed.map((b) => (
-        <Card key={b.id} sx={{ mb: 1 }}>
-          <CardContent sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="h6" component="h3" sx={{ flex: 1 }}>
-              {b.title || "—"}
-            </Typography>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={markComplete}
+                      onChange={(e) => setMarkComplete(e.target.checked)}
+                      disabled={!current?.title?.trim() || !current?.author?.trim()}
+                    />
+                  }
+                  label="Mark current as completed"
+                />
 
-            {isMe && (
-              <Button variant="text" color="error" onClick={() => setDeleteId(b.id)}>
-                Delete
-              </Button>
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                  <Button variant="contained" onClick={saveCurrent}>
+                    Save
+                  </Button>
+                </Box>
+              </>
             )}
           </CardContent>
         </Card>
-      ))}
-    </>
-  );
-}
+
+        {bucket.completed.map((b) => (
+          <ReadBookCard
+            key={b.id}
+            row={b}
+            showDelete={!!isMe}
+            onDelete={() => setDeleteId(b.id)}
+          />
+        ))}
+      </>
+    );
+  }
 
   return (
     <Box sx={{ p: 2 }}>
+      <MobileNav />
+
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
         <Typography variant="h3" component="h1">
           2026 Book Club Bros
@@ -417,12 +528,12 @@ function renderMobileDetails(m: { email: string; name: string }, rankIndex: numb
         </Typography>
       )}
 
-      {/* MOBILE: accordions */}
       {isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {orderedForMobile.map((m, rankIndex) => {
             const bucket = byEmail[m.email] ?? { completed: [] };
-            const currentTitle = bucket.current?.title?.trim() || "—";
+            const current = bucket.current;
+            const currentLine = current ? formatBookLine(current.title, current.author) : "—";
             const isExpanded = !!expanded[m.email];
 
             return (
@@ -446,35 +557,32 @@ function renderMobileDetails(m: { email: string; name: string }, rankIndex: numb
                   }}
                 >
                   <Box sx={{ width: "100%" }}>
-                    <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>
+                    <Typography variant="h6" component="h2" sx={{ fontWeight: 800 }}>
                       {rankLabel(rankIndex)}
                     </Typography>
-                    <Typography variant="h6" component="h2">
+                    <Typography variant="subtitle1" component="h2">
                       {m.name}
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                      Current: {currentTitle}
+                      Current: {currentLine}
                     </Typography>
                   </Box>
                 </AccordionSummary>
 
-                <AccordionDetails>
-                  {renderMobileDetails(m, rankIndex)}
-                </AccordionDetails>
+                <AccordionDetails>{renderMobileDetails(m)}</AccordionDetails>
               </Accordion>
             );
           })}
         </Box>
       )}
 
-      {/* DESKTOP: 3 columns, page scroll */}
       {!isMobile && (
         <Grid container spacing={2}>
           {orderedForDesktop.map((m) => {
             const rankIndex = scored.findIndex((s) => s.email === m.email);
             return (
               <Grid key={m.email} size={{ xs: 12, md: 4 }}>
-                {renderColumn(m, rankIndex)}
+                {renderDesktopColumn(m, rankIndex)}
               </Grid>
             );
           })}
