@@ -18,7 +18,6 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Grid from "@mui/material/Grid";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
-import MobileNav from "@/components/MobileNav";
 
 type BookRow = {
   id: string;
@@ -140,20 +139,20 @@ export default function HomePage() {
     }))
     .sort((a, b) => b.completedCount - a.completedCount);
 
-  const orderedForDesktop = scored.length === 3 ? [scored[1], scored[0], scored[2]] : scored;
+  const orderedForDesktop =
+    scored.length === 3 ? [scored[1], scored[0], scored[2]] : scored;
   const orderedForMobile = scored;
 
-  function renderDesktopColumn(m: { email: string; name: string }, rankIndex: number) {
+  function renderDesktopColumn(
+    m: { email: string; name: string },
+    rankIndex: number
+  ) {
     const bucket = byEmail[m.email] ?? { completed: [] };
     const current = bucket.current;
 
     return (
       <Box>
-        <Typography
-          variant="h5"
-          component="h2"
-          sx={{ fontWeight: 800, mt: 3, mb: 1 }}
-        >
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mt: 3, mb: 1 }}>
           {rankLabel(rankIndex)}
         </Typography>
 
@@ -216,6 +215,15 @@ export default function HomePage() {
 
   return (
     <>
+      <Typography variant="h3" component="h1" gutterBottom>
+        Book Bros Book Club 2026
+      </Typography>
+
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+        <Button component={Link} href="/admin/login" variant="outlined">
+          Log in
+        </Button>
+      </Box>
 
       {isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>

@@ -1,19 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
+import { AppBar, Box, Toolbar, Typography } from "@mui/material";
 import MobileNav from "@/components/MobileNav";
 
 export default function SiteHeader() {
   return (
     <AppBar position="sticky" color="default" elevation={0}>
       <Toolbar sx={{ gap: 1 }}>
-        <MobileNav />
+        {/* Mobile-only hamburger */}
+        <Box sx={{ display: { xs: "flex", md: "none" } }}>
+          <MobileNav />
+        </Box>
 
         <Typography
           component={Link}
           href="/"
-          variant="h5"
+          variant="h6"
           sx={{ textDecoration: "none", color: "inherit", fontWeight: 700 }}
         >
           Book Bros Book Club 2026
@@ -21,21 +24,9 @@ export default function SiteHeader() {
 
         <Box sx={{ flex: 1 }} />
 
-        {/* Desktop quick links */}
-        <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1 }}>
-          <Button component={Link} href="/top-tens">
-            Our Top Tens
-          </Button>
-          <Button component={Link} href="/book-report">
-            Book Report
-          </Button>
-          <Button component={Link} href="/donate">
-            Donate
-          </Button>
-          <Button component={Link} href="/admin/login" variant="outlined">
-            Admin Login
-          </Button>
-        </Box>
+        {/* Desktop-only section can be blank for now or keep nav buttons if you want.
+            We are moving auth to footer, so no login/logout here. */}
+        <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1 }} />
       </Toolbar>
     </AppBar>
   );

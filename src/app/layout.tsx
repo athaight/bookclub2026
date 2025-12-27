@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
-import { CssBaseline, Container } from "@mui/material";
+import { Box, CssBaseline, Container } from "@mui/material";
 import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Book Bros Book Club 2026",
@@ -15,10 +16,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <AppRouterCacheProvider>
           <CssBaseline />
-          <Container maxWidth="lg" sx={{ py: 3 }}>
+
+          {/* Sticky footer page layout */}
+          <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
             <SiteHeader />
-            {children}
-          </Container>
+
+            <Container
+              maxWidth="lg"
+              sx={{ py: 3, flex: 1, display: "flex", flexDirection: "column" }}
+            >
+              <Box sx={{ flex: 1 }}>{children}</Box>
+              <SiteFooter />
+            </Container>
+          </Box>
         </AppRouterCacheProvider>
       </body>
     </html>

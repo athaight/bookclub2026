@@ -14,12 +14,26 @@ export default function AdminLoginPage() {
     setLoading(true);
     setMsg(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-    if (error) setMsg(error.message);
-    else window.location.href = "/admin";
+    if (error) {
+      setMsg(error.message);
+      setLoading(false);
+      return;
+    }
 
-    setLoading(false);
+    // confirm session exists before redirect
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      setMsg("Logged in, but session didn’t load. Refresh and try again.");
+      setLoading(false);
+      return;
+    }
+
+    window.location.href = "/admin";
   }
 
   return (
@@ -47,7 +61,11 @@ export default function AdminLoginPage() {
             fullWidth
           />
 
-          <Button variant="contained" onClick={onLogin} disabled={loading || !email || !password}>
+          <Button
+            variant="contained"
+            onClick={onLogin}
+            disabled={loading || !email.trim() || !password}
+          >
             {loading ? "Logging in..." : "Log in"}
           </Button>
 
