@@ -8,7 +8,7 @@ export default function BookReportPage() {
     <>
       <MobileNav />
       <Typography variant="h3" component="h1" gutterBottom>
-        Book Report
+        Book Reports
       </Typography>
     </>
   );
