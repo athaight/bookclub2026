@@ -24,7 +24,6 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
-import MobileNav from "@/components/MobileNav";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
@@ -297,18 +296,14 @@ export default function TopTensPage() {
 
   if (loading || checkingSession) {
     return (
-      <>
-        <MobileNav />
-        <Box sx={{ textAlign: 'center', mt: 4 }}>
-          <Typography variant="h6">Loading top ten lists...</Typography>
-        </Box>
-      </>
+      <Box sx={{ textAlign: 'center', mt: 4 }}>
+        <Typography variant="h6">Loading top ten lists...</Typography>
+      </Box>
     );
   }
 
   return (
     <>
-      <MobileNav />
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
           Our Top Tens

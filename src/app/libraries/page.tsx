@@ -28,7 +28,6 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
-import MobileNav from "@/components/MobileNav";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
@@ -332,15 +331,12 @@ export default function OurLibrariesPage() {
 
   if (loading || checkingSession) {
     return (
-      <>
-        <MobileNav />
-        <Box sx={{ textAlign: "center", mt: 4 }}>
-          <CircularProgress />
-          <Typography variant="h6" sx={{ mt: 2 }}>
-            Loading libraries...
-          </Typography>
-        </Box>
-      </>
+      <Box sx={{ textAlign: "center", mt: 4 }}>
+        <CircularProgress />
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          Loading libraries...
+        </Typography>
+      </Box>
     );
   }
 
@@ -433,8 +429,6 @@ export default function OurLibrariesPage() {
 
   return (
     <>
-      <MobileNav />
-
       <Box sx={{ textAlign: "center", mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
           Our Libraries

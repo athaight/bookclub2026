@@ -1,12 +1,10 @@
 "use client";
 
 import { Typography, Box, Card, CardContent } from "@mui/material";
-import MobileNav from "@/components/MobileNav";
 
 export default function BookReportPage() {
   return (
     <>
-      <MobileNav />
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
           Book Reports
