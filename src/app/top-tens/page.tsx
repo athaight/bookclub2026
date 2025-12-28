@@ -47,7 +47,7 @@ export default function TopTensPage() {
         .select("*")
         .eq("top_ten", true)
         .in("member_email", members.map((m) => m.email))
-        .order("completed_at", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching top ten books:", error);
@@ -138,12 +138,12 @@ export default function TopTensPage() {
     try {
       const { error } = await supabase.from("books").insert({
         member_email: authedEmail,
-        status: "completed", // Mark as completed since it's in top ten
+        status: "completed",
         title,
         author: author || "",
         comment: comment || "",
         top_ten: true,
-        completed_at: new Date().toISOString(),
+        // Don't set completed_at for top ten books - they're not reading completions
       });
 
       if (error) throw new Error(error.message);
@@ -160,7 +160,7 @@ export default function TopTensPage() {
         .select("*")
         .eq("top_ten", true)
         .in("member_email", members.map((m) => m.email))
-        .order("completed_at", { ascending: false });
+        .order("created_at", { ascending: false });
 
       const grouped: Record<string, BookRow[]> = {};
       members.forEach((member) => {

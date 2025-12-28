@@ -196,6 +196,7 @@ export default function HomePage() {
         "member_email",
         members.map((m) => m.email)
       )
+      .neq("top_ten", true)
       .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear})`);
 
     if (error) {
