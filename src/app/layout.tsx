@@ -23,11 +23,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
             <Container
               maxWidth="lg"
-              sx={{ py: 3, flex: 1, display: "flex", flexDirection: "column" }}
+              sx={{ py: 3, flex: 1, pb: 8 }}  // Added pb: 8 to prevent overlap with fixed footer
             >
-              <Box sx={{ flex: 1 }}>{children}</Box>
-              <SiteFooter />
+              {children}
             </Container>
+
+            <SiteFooter />
           </Box>
         </AppRouterCacheProvider>
       </body>
