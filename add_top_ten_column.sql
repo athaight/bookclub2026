@@ -1,0 +1,1 @@
+ALTER TABLE books ADD COLUMN top_ten BOOLEAN DEFAULT false;

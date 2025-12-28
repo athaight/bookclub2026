@@ -126,6 +126,7 @@ export default function HomePage() {
   const [draftAuthor, setDraftAuthor] = useState("");
   const [draftComment, setDraftComment] = useState("");
   const [markCompleted, setMarkCompleted] = useState(false);
+  const [addToTopTen, setAddToTopTen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<BookRow | null>(null);
@@ -249,6 +250,7 @@ export default function HomePage() {
     setDraftAuthor("");
     setDraftComment("");
     setMarkCompleted(false);
+    setAddToTopTen(false);
     setEditingCurrent(false);
   }
 
@@ -257,6 +259,7 @@ export default function HomePage() {
     setDraftAuthor(current.author ?? "");
     setDraftComment((current.comment ?? "").slice(0, 200));
     setMarkCompleted(false);
+    setAddToTopTen(false);
     setEditingCurrent(true);
   }
 
@@ -312,6 +315,7 @@ export default function HomePage() {
           .update({
             status: "completed",
             completed_at: new Date().toISOString(),
+            top_ten: addToTopTen || undefined,
           })
           .eq("id", current.id);
 
@@ -320,6 +324,7 @@ export default function HomePage() {
       } else {
         setEditingCurrent(false);
         setMarkCompleted(false);
+        setAddToTopTen(false);
       }
 
       await refresh();
@@ -389,6 +394,18 @@ export default function HomePage() {
                   />
                 }
                 label="Mark this current book as completed"
+              />
+            )}
+
+            {!!current && markCompleted && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={addToTopTen}
+                    onChange={(e) => setAddToTopTen(e.target.checked)}
+                  />
+                }
+                label="Add to top ten list"
               />
             )}
 

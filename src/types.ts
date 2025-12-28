@@ -7,4 +7,5 @@ export type BookRow = {
   comment?: string;
   created_at: string;
   completed_at: string | null;
+  top_ten?: boolean;
 };
