@@ -1,17 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { AppBar, Box, Toolbar, Typography } from "@mui/material";
+import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 import MobileNav from "@/components/MobileNav";
 
 export default function SiteHeader() {
   return (
     <AppBar position="sticky" color="default" elevation={0}>
       <Toolbar sx={{ gap: 1 }}>
-        {/* Mobile-only hamburger */}
-        <Box sx={{ display: { xs: "flex", md: "none" } }}>
-          <MobileNav />
-        </Box>
+        <MobileNav />
 
         <Typography
           component={Link}
@@ -24,9 +21,18 @@ export default function SiteHeader() {
 
         <Box sx={{ flex: 1 }} />
 
-        {/* Desktop-only section can be blank for now or keep nav buttons if you want.
-            We are moving auth to footer, so no login/logout here. */}
-        <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1 }} />
+        {/* Desktop quick links (NO login here) */}
+        <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1 }}>
+          <Button component={Link} href="/top-tens">
+            Our Top Tens
+          </Button>
+          <Button component={Link} href="/book-report">
+            Book Report
+          </Button>
+          <Button component={Link} href="/donate">
+            Donate
+          </Button>
+        </Box>
       </Toolbar>
     </AppBar>
   );

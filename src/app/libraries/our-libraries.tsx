@@ -3,7 +3,7 @@
 import { Typography } from "@mui/material";
 import MobileNav from "@/components/MobileNav";
 
-export default function TopTensPage() {
+export default function OurLibrariesPage() {
   return (
     <>
       <MobileNav />

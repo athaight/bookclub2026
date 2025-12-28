@@ -3,6 +3,8 @@ export type BookRow = {
   member_email: string;
   status: "current" | "completed";
   title: string;
+  author?: string;
+  comment?: string;
   created_at: string;
   completed_at: string | null;
 };
