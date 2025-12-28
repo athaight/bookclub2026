@@ -5,19 +5,25 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Checkbox,
+  CircularProgress,
   Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Divider,
   FormControlLabel,
   IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
   TextField,
   Typography,
   useMediaQuery,
@@ -26,9 +32,11 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
+import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
+import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 
 type Member = { email: string; name: string };
 
@@ -61,6 +69,13 @@ function BookCard({
     <Card sx={{ mb: 1 }}>
       <CardContent sx={{ pb: 1.5 }}>
         <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+          {row.cover_url && (
+            <Avatar
+              src={row.cover_url}
+              variant="rounded"
+              sx={{ width: 40, height: 60, flexShrink: 0 }}
+            />
+          )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h6" component="h3" noWrap>
               {(row.title ?? "").trim() || "—"}
@@ -125,8 +140,15 @@ export default function HomePage() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftAuthor, setDraftAuthor] = useState("");
   const [draftComment, setDraftComment] = useState("");
+  const [draftCoverUrl, setDraftCoverUrl] = useState<string | null>(null);
   const [markCompleted, setMarkCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Book search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<BookSearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<BookRow | null>(null);
 
@@ -254,16 +276,56 @@ export default function HomePage() {
     setDraftTitle("");
     setDraftAuthor("");
     setDraftComment("");
+    setDraftCoverUrl(null);
     setMarkCompleted(false);
     setEditingCurrent(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowResults(false);
   }
 
   function loadEditorFromCurrent(current: BookRow) {
     setDraftTitle(current.title ?? "");
     setDraftAuthor(current.author ?? "");
     setDraftComment((current.comment ?? "").slice(0, 200));
+    setDraftCoverUrl(current.cover_url ?? null);
     setMarkCompleted(false);
     setEditingCurrent(true);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowResults(false);
+  }
+
+  // Book search handlers
+  async function handleSearch() {
+    const query = searchQuery.trim();
+    if (query.length < 3) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    setShowResults(true);
+
+    try {
+      const results = await searchBooks(query);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  function handleSelectBook(book: BookSearchResult) {
+    setDraftTitle(book.title);
+    setDraftAuthor(book.author);
+    setDraftCoverUrl(book.coverUrl || null);
+    setSearchResults([]);
+    setShowResults(false);
+    setSearchQuery("");
   }
 
   async function saveCurrent(memberEmail: string) {
@@ -293,11 +355,11 @@ export default function HomePage() {
           title,
           author: author || "",
           comment: comment || "",
+          cover_url: draftCoverUrl || null,
         });
         if (error) throw new Error(error.message);
         await refresh();
-        setEditingCurrent(false);
-        setMarkCompleted(false);
+        resetEditorToBlank();
         return;
       }
 
@@ -307,6 +369,7 @@ export default function HomePage() {
           title,
           author: author || "",
           comment: comment || "",
+          cover_url: draftCoverUrl || null,
         })
         .eq("id", current.id);
 
@@ -318,6 +381,7 @@ export default function HomePage() {
           .update({
             status: "completed",
             completed_at: new Date().toISOString(),
+            in_library: true,
           })
           .eq("id", current.id);
 
@@ -363,6 +427,90 @@ export default function HomePage() {
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
             <Typography variant="overline">Current book (edit)</Typography>
+
+            {/* Book Search Section */}
+            <Box>
+              <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                Search for a book or enter details manually
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  placeholder="Search by title or author..."
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearch();
+                    }
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleSearch}
+                  disabled={searchLoading || searchQuery.trim().length < 3}
+                  sx={{ minWidth: 'auto', px: 2 }}
+                >
+                  {searchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
+                </Button>
+              </Box>
+
+              {/* Search Results */}
+              {showResults && (
+                <Box sx={{ mt: 1, maxHeight: 160, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  {searchLoading ? (
+                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : searchResults.length > 0 ? (
+                    <List dense disablePadding>
+                      {searchResults.map((book, index) => (
+                        <ListItemButton
+                          key={`${book.title}-${book.author}-${index}`}
+                          onClick={() => handleSelectBook(book)}
+                        >
+                          {book.coverUrl && (
+                            <Avatar
+                              src={book.coverUrl}
+                              variant="rounded"
+                              sx={{ width: 28, height: 42, mr: 1.5 }}
+                            />
+                          )}
+                          <ListItemText
+                            primary={book.title}
+                            secondary={book.author || 'Unknown author'}
+                            primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
+                            secondaryTypographyProps={{ noWrap: true }}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography variant="body2" sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+                      No results found. Enter details manually below.
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Box>
+
+            {/* Selected Book Preview */}
+            {draftCoverUrl && (
+              <Box sx={{ display: 'flex', alignItems: 'center', p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Avatar
+                  src={draftCoverUrl}
+                  variant="rounded"
+                  sx={{ width: 40, height: 60, mr: 1.5 }}
+                />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 'medium' }}>{draftTitle}</Typography>
+                  <Typography variant="caption" noWrap color="text.secondary">{draftAuthor}</Typography>
+                </Box>
+              </Box>
+            )}
 
             <TextField
               label="Title"
@@ -511,6 +659,15 @@ export default function HomePage() {
           {renderCurrentBlock(m.email)}
         </Box>
 
+        {bucket.completed.length > 0 && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="h6" component="h3" sx={{ mb: 1.5 }}>
+              Books read
+            </Typography>
+          </>
+        )}
+
         {bucket.completed.map((b) => (
           <BookCard
             key={b.id}
@@ -530,6 +687,15 @@ export default function HomePage() {
       <>
         {renderCurrentBlock(m.email)}
 
+        {bucket.completed.length > 0 && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="h6" component="h3" sx={{ mb: 1.5 }}>
+              Books read
+            </Typography>
+          </>
+        )}
+
         {bucket.completed.map((b) => (
           <BookCard
             key={b.id}
@@ -544,6 +710,15 @@ export default function HomePage() {
 
   return (
     <>
+      <Box sx={{ textAlign: 'center', mb: 4 }}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          What we&apos;re currently reading
+        </Typography>
+        <Typography variant="body1" sx={{ maxWidth: 700, mx: 'auto', color: 'text.secondary' }}>
+          Our 2026 challenge is to see who reads the most books this year. Here, you&apos;ll see what we&apos;re currently reading and what we&apos;ve finished to determine which one of us is a true Bibliophile (1st place), or could be considered a Bookworm (2nd place), or just Bookish (3rd place).
+        </Typography>
+      </Box>
+
       {err && (
         <Box sx={{ mb: 2 }}>
           <Typography color="error">{err}</Typography>

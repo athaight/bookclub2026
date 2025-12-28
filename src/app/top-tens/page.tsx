@@ -17,12 +17,18 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  CircularProgress,
+  ListItemButton,
+  Avatar,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
+import SearchIcon from "@mui/icons-material/Search";
+import DeleteIcon from "@mui/icons-material/Delete";
 import MobileNav from "@/components/MobileNav";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
+import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 
 const normEmail = (s: string) => s.trim().toLowerCase();
 
@@ -38,7 +44,19 @@ export default function TopTensPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formAuthor, setFormAuthor] = useState("");
   const [formComment, setFormComment] = useState("");
+  const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Book search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<BookSearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState<BookRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchTopTenBooks() {
@@ -114,6 +132,51 @@ export default function TopTensPage() {
     };
   }, [members]);
 
+  // Search for books
+  const handleSearch = async () => {
+    const query = searchQuery.trim();
+    if (query.length < 3) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    setShowResults(true);
+
+    try {
+      const results = await searchBooks(query);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Select a book from search results
+  const handleSelectBook = (book: BookSearchResult) => {
+    setFormTitle(book.title);
+    setFormAuthor(book.author);
+    setFormCoverUrl(book.coverUrl || null);
+    setSearchResults([]);
+    setShowResults(false);
+    setSearchQuery("");
+  };
+
+  // Reset dialog state when opening/closing
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowResults(false);
+    setFormTitle("");
+    setFormAuthor("");
+    setFormComment("");
+    setFormCoverUrl(null);
+  };
+
   const handleAddBook = async () => {
     if (!authedEmail) return;
 
@@ -142,7 +205,9 @@ export default function TopTensPage() {
         title,
         author: author || "",
         comment: comment || "",
+        cover_url: formCoverUrl || null,
         top_ten: true,
+        in_library: true,
         // Don't set completed_at for top ten books - they're not reading completions
       });
 
@@ -152,6 +217,10 @@ export default function TopTensPage() {
       setFormTitle("");
       setFormAuthor("");
       setFormComment("");
+      setFormCoverUrl(null);
+      setSearchQuery("");
+      setSearchResults([]);
+      setShowResults(false);
       setDialogOpen(false);
 
       // Refresh the data
@@ -177,6 +246,55 @@ export default function TopTensPage() {
     }
   };
 
+  // Handle delete book
+  const handleDeleteClick = (book: BookRow) => {
+    setBookToDelete(book);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!bookToDelete) return;
+
+    setDeleting(true);
+
+    try {
+      const { error } = await supabase
+        .from("books")
+        .delete()
+        .eq("id", bookToDelete.id);
+
+      if (error) throw new Error(error.message);
+
+      // Refresh the data
+      const { data } = await supabase
+        .from("books")
+        .select("*")
+        .eq("top_ten", true)
+        .in("member_email", members.map((m) => m.email))
+        .order("created_at", { ascending: false });
+
+      const grouped: Record<string, BookRow[]> = {};
+      members.forEach((member) => {
+        grouped[member.email] = data
+          ?.filter((book) => book.member_email === member.email)
+          .slice(0, 10) || [];
+      });
+
+      setTopTenBooks(grouped);
+      setDeleteDialogOpen(false);
+      setBookToDelete(null);
+    } catch (e) {
+      alert(`Error deleting book: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setBookToDelete(null);
+  };
+
   if (loading || checkingSession) {
     return (
       <>
@@ -198,11 +316,6 @@ export default function TopTensPage() {
         <Typography variant="h6" component="p" sx={{ mb: 2 }}>
           The books that made our lists
         </Typography>
-        {process.env.NODE_ENV === 'development' && (
-          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
-            Debug: Auth email: {authedEmail || 'none'}
-          </Typography>
-        )}
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
@@ -230,22 +343,41 @@ export default function TopTensPage() {
                 {topTenBooks[member.email]?.length > 0 ? (
                   <List>
                     {topTenBooks[member.email].map((book, index) => (
-                      <ListItem key={book.id} sx={{ px: 0, flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <ListItemText
-                          primary={
-                            <Typography variant="body1" component="span">
-                              <Box component="span" sx={{ fontWeight: 'bold', mr: 1 }}>
-                                {index + 1}.
-                              </Box>
-                              {book.title || "Untitled"}
+                      <ListItem key={book.id} sx={{ px: 0, alignItems: 'flex-start' }}>
+                        {book.cover_url && (
+                          <Avatar
+                            src={book.cover_url}
+                            variant="rounded"
+                            sx={{ width: 40, height: 60, mr: 1.5, mt: 0.5, flexShrink: 0 }}
+                          />
+                        )}
+                        <Box sx={{ flex: 1 }}>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body1" component="span">
+                                <Box component="span" sx={{ fontWeight: 'bold', mr: 1 }}>
+                                  {index + 1}.
+                                </Box>
+                                {book.title || "Untitled"}
+                              </Typography>
+                            }
+                            secondary={book.author ? `by ${book.author}` : null}
+                          />
+                          {book.comment && (
+                            <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic', color: 'text.secondary' }}>
+                              {book.comment}
                             </Typography>
-                          }
-                          secondary={book.author ? `by ${book.author}` : null}
-                        />
-                        {book.comment && (
-                          <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary', pl: 3 }}>
-                            {book.comment}
-                          </Typography>
+                          )}
+                        </Box>
+                        {authedEmail === member.email && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteClick(book)}
+                            sx={{ ml: 1, color: 'error.main' }}
+                            aria-label="Delete book"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
                         )}
                       </ListItem>
                     ))}
@@ -261,11 +393,96 @@ export default function TopTensPage() {
         ))}
       </Box>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
         <DialogTitle>Add to Your Top Ten</DialogTitle>
         <DialogContent>
+          {/* Book Search Section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+              Search for a book or enter details manually
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                placeholder="Search by title or author..."
+                fullWidth
+                variant="outlined"
+                size="small"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+              />
+              <Button
+                variant="contained"
+                onClick={handleSearch}
+                disabled={searchLoading || searchQuery.trim().length < 3}
+                sx={{ minWidth: 'auto', px: 2 }}
+              >
+                {searchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
+              </Button>
+            </Box>
+
+            {/* Search Results */}
+            {showResults && (
+              <Box sx={{ mt: 1, maxHeight: 200, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                {searchLoading ? (
+                  <Box sx={{ p: 2, textAlign: 'center' }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : searchResults.length > 0 ? (
+                  <List dense disablePadding>
+                    {searchResults.map((book, index) => (
+                      <ListItemButton
+                        key={`${book.title}-${book.author}-${index}`}
+                        onClick={() => handleSelectBook(book)}
+                      >
+                        {book.coverUrl && (
+                          <Avatar
+                            src={book.coverUrl}
+                            variant="rounded"
+                            sx={{ width: 32, height: 48, mr: 1.5 }}
+                          />
+                        )}
+                        <ListItemText
+                          primary={book.title}
+                          secondary={book.author || 'Unknown author'}
+                          primaryTypographyProps={{ noWrap: true }}
+                          secondaryTypographyProps={{ noWrap: true }}
+                        />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="body2" sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+                    No results found. Enter details manually below.
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Selected Book Preview */}
+          {formCoverUrl && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Avatar
+                src={formCoverUrl}
+                variant="rounded"
+                sx={{ width: 48, height: 72, mr: 2 }}
+              />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{formTitle}</Typography>
+                <Typography variant="caption" color="text.secondary">{formAuthor}</Typography>
+              </Box>
+            </Box>
+          )}
+
           <TextField
-            autoFocus
             margin="dense"
             label="Book Title"
             fullWidth
@@ -296,11 +513,29 @@ export default function TopTensPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>
+          <Button onClick={handleDialogClose} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleAddBook} variant="contained" disabled={saving}>
             {saving ? "Saving..." : "Add to Top Ten"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="xs" fullWidth>
+        <DialogTitle>Remove Book?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to remove <strong>{bookToDelete?.title}</strong> from your top ten list?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleting}>
+            {deleting ? "Removing..." : "Remove"}
           </Button>
         </DialogActions>
       </Dialog>

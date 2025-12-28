@@ -16,7 +16,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import AuthFooterAction from "@/components/AuthFooterAction";
 
 const navItems = [
-  { label: "Home", href: "/" },
+  { label: "Reading now", href: "/" },
   { label: "Our Top Tens", href: "/top-tens" },
   { label: "Our Libraries", href: "/libraries" },
   { label: "Book Reports", href: "/book-report" },
