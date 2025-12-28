@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
             <Container
               maxWidth="lg"
-              sx={{ py: 3, flex: 1, pb: 8 }}  // Added pb: 8 to prevent overlap with fixed footer
+              sx={{ pt: 3, pb: '88px', flex: 1 }}  // 64px footer height + 24px gap
             >
               {children}
             </Container>

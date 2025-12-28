@@ -567,15 +567,25 @@ export default function HomePage() {
     // Otherwise: show current card (with caret expander) + Edit button for owner
     if (current) {
       return (
-        <>
-          <Typography variant="overline" sx={{ display: "block", mb: 0.5 }}>
-            Current book
-          </Typography>
-
-          <BookCard
-            row={current}
-            rightAction={
-              isOwner ? (
+        <Card sx={{ height: 120 }}>
+          <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flex: 1 }}>
+              {current.cover_url && (
+                <Avatar
+                  src={current.cover_url}
+                  variant="rounded"
+                  sx={{ width: 40, height: 60, flexShrink: 0 }}
+                />
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h6" component="h3" noWrap>
+                  {(current.title ?? "").trim() || "—"}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.8 }} noWrap>
+                  {(current.author ?? "").trim() || "—"}
+                </Typography>
+              </Box>
+              {isOwner && (
                 <IconButton
                   aria-label="edit current"
                   onClick={() => loadEditorFromCurrent(current)}
@@ -583,50 +593,41 @@ export default function HomePage() {
                 >
                   <EditIcon fontSize="small" />
                 </IconButton>
-              ) : null
-            }
-          />
-
-          {isOwner && !current && (
-            <Button variant="outlined" onClick={() => setEditingCurrent(true)}>
-              Add current
-            </Button>
-          )}
-        </>
-      );
-    }
-
-    // No current saved yet
-    if (isOwner) {
-      return (
-        <Card sx={{ mb: 2 }}>
-          <CardContent>
-            <Typography variant="overline">Current book</Typography>
-            <Typography variant="body2" sx={{ opacity: 0.7, mt: 1 }}>
-              No current book saved yet.
-            </Typography>
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
-              <Button
-                startIcon={<EditIcon />}
-                onClick={() => {
-                  resetEditorToBlank();
-                  setEditingCurrent(true);
-                }}
-                variant="outlined"
-              >
-                Add
-              </Button>
+              )}
             </Box>
           </CardContent>
         </Card>
       );
     }
 
+    // No current saved yet
+    if (isOwner) {
+      return (
+        <Card sx={{ height: 120 }}>
+          <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <Typography variant="body2" sx={{ opacity: 0.7, mb: 1 }}>
+              No current book saved yet.
+            </Typography>
+            <Button
+              startIcon={<EditIcon />}
+              onClick={() => {
+                resetEditorToBlank();
+                setEditingCurrent(true);
+              }}
+              variant="outlined"
+              size="small"
+            >
+              Add
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="overline">Current book</Typography>
-          <Typography variant="body1" sx={{ mt: 0.5 }}>
+      <Card sx={{ height: 120 }}>
+        <CardContent sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Typography variant="body1" sx={{ opacity: 0.5 }}>
             —
           </Typography>
         </CardContent>
@@ -712,7 +713,7 @@ export default function HomePage() {
     <>
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          What we&apos;re currently reading
+          Reading Challenge
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: 'auto', color: 'text.secondary' }}>
           Our 2026 challenge is to see who reads the most books this year. Here, you&apos;ll see what we&apos;re currently reading and what we&apos;ve finished to determine which one of us is a true Bibliophile (1st place), or could be considered a Bookworm (2nd place), or just Bookish (3rd place).
@@ -773,22 +774,100 @@ export default function HomePage() {
       )}
 
       {!isMobile && (
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
-            gap: 2,
-          }}
-        >
-          {orderedForDesktop.map((m) => {
-            const rankIndex = scored.findIndex((s) => s.email === m.email);
-            return (
-              <Box key={m.email}>
-                {renderDesktopColumn(m, rankIndex)}
-              </Box>
-            );
-          })}
-        </Box>
+        <>
+          {/* Sticky Column Headers */}
+          <Box
+            sx={{
+              position: "sticky",
+              top: 64, // Account for header height
+              zIndex: 10,
+              bgcolor: "background.default",
+              pt: 2,
+              pb: 1,
+              mb: 1,
+            }}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 2,
+              }}
+            >
+              {orderedForDesktop.map((m) => {
+                const rankIndex = scored.findIndex((s) => s.email === m.email);
+                return (
+                  <Box key={m.email}>
+                    <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mb: 0.5 }}>
+                      {rankLabel(rankIndex)}
+                    </Typography>
+                    <Typography variant="body1" component="h2" sx={{ color: "text.secondary" }}>
+                      {m.name}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* Current Reading Section Header */}
+          <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
+            Current book
+          </Typography>
+
+          {/* Current Reading Cards - Fixed Height */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 2,
+            }}
+          >
+            {orderedForDesktop.map((m) => {
+              return (
+                <Box key={m.email}>
+                  {renderCurrentBlock(m.email)}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Books Read Section - Aligned Header */}
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
+            Books read
+          </Typography>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 2,
+            }}
+          >
+            {orderedForDesktop.map((m) => {
+              const bucket = byEmail[m.email] ?? { completed: [] };
+              return (
+                <Box key={m.email}>
+                  {bucket.completed.length > 0 ? (
+                    bucket.completed.map((b) => (
+                      <BookCard
+                        key={b.id}
+                        row={b}
+                        canDelete={authedEmail === m.email}
+                        onDelete={(row) => setDeleteTarget(row)}
+                      />
+                    ))
+                  ) : (
+                    <Typography variant="body2" sx={{ fontStyle: "italic", color: "text.secondary" }}>
+                      No books read yet
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </>
       )}
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>

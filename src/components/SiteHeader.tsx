@@ -24,7 +24,7 @@ export default function SiteHeader() {
         {/* Desktop quick links (NO login here) */}
         <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1 }}>
           <Button component={Link} href="/">
-            Reading now
+            Reading Challenge
           </Button>
           <Button component={Link} href="/top-tens">
             Our Top Tens

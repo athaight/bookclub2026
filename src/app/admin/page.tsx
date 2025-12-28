@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Divider,
   FormControlLabel,
   IconButton,
   TextField,
@@ -587,22 +588,92 @@ export default function AdminPage() {
       )}
 
       {!isMobile && (
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
-            gap: 2,
-          }}
-        >
-          {orderedForDesktop.map((m) => {
-            const rankIndex = scored.findIndex((s) => s.email === m.email);
-            return (
+        <>
+          {/* Sticky Column Headers */}
+          <Box
+            sx={{
+              position: "sticky",
+              top: 64, // Account for header height
+              zIndex: 10,
+              bgcolor: "background.default",
+              pt: 2,
+              pb: 1,
+              mb: 1,
+            }}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 2,
+              }}
+            >
+              {orderedForDesktop.map((m) => {
+                const rankIndex = scored.findIndex((s) => s.email === m.email);
+                return (
+                  <Box key={m.email}>
+                    <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mb: 0.5 }}>
+                      {rankLabel(rankIndex)}
+                    </Typography>
+                    <Typography variant="body1" component="h2" sx={{ color: "text.secondary" }}>
+                      {m.name}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* Current Reading Section Header */}
+          <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
+            Current book
+          </Typography>
+
+          {/* Current Reading Cards */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 2,
+            }}
+          >
+            {orderedForDesktop.map((m) => (
               <Box key={m.email}>
-                {renderDesktopColumn(m, rankIndex)}
+                {renderAdminCurrentBlock(m.email)}
               </Box>
-            );
-          })}
-        </Box>
+            ))}
+          </Box>
+
+          {/* Books Read Section */}
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
+            Books read
+          </Typography>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 2,
+            }}
+          >
+            {orderedForDesktop.map((m) => {
+              const bucket = byEmail[m.email] ?? { completed: [] };
+              return (
+                <Box key={m.email}>
+                  {bucket.completed.map((b) => (
+                    <BookCard
+                      key={b.id}
+                      row={b}
+                      canDelete={authedEmail === m.email}
+                      onDelete={(row) => setDeleteTarget(row)}
+                    />
+                  ))}
+                </Box>
+              );
+            })}
+          </Box>
+        </>
       )}
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
