@@ -28,7 +28,6 @@ const normEmail = (s: string) => s.trim().toLowerCase();
 
 export default function TopTensPage() {
   const members = getMembers().map((m) => ({ ...m, email: normEmail(m.email) }));
-  console.log('TopTens Members:', members);
   const [topTenBooks, setTopTenBooks] = useState<Record<string, BookRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
@@ -82,14 +81,12 @@ export default function TopTensPage() {
 
       if (email) {
         const allowed = members.some((m) => m.email === email);
-        console.log('TopTens Auth Debug:', { email, allowed, members: members.map(m => m.email) });
         if (!allowed) {
           setAuthedEmail(null);
         } else {
           setAuthedEmail(email);
         }
       } else {
-        console.log('TopTens Auth Debug: No email');
         setAuthedEmail(null);
       }
 
@@ -98,7 +95,6 @@ export default function TopTensPage() {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       const email = session?.user?.email ? normEmail(session.user.email) : null;
-      console.log('TopTens Auth State Change:', { email, event: _evt });
       if (email) {
         const allowed = members.some((m) => m.email === email);
         if (!allowed) {
@@ -218,7 +214,6 @@ export default function TopTensPage() {
                   <Typography variant="h5" component="h2" sx={{ textAlign: 'center', flex: 1 }}>
                     {member.name}&apos;s Top 10
                   </Typography>
-                  {console.log('Edit button check:', { authedEmail, memberEmail: member.email, shouldShow: authedEmail === member.email })}
                   {authedEmail === member.email && (
                     <IconButton
                       onClick={() => setDialogOpen(true)}
