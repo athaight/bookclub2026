@@ -39,7 +39,7 @@ const normEmail = (s: string) => s.trim().toLowerCase();
 function rankLabel(rankIndex: number) {
   if (rankIndex === 0) return "Bibliophile";
   if (rankIndex === 1) return "Bookworm";
-  return "Can read gud";
+  return "Bookish";
 }
 
 function BookCard({
