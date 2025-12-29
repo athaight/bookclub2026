@@ -16,7 +16,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import AuthFooterAction from "@/components/AuthFooterAction";
 
 const navItems = [
-  { label: "Reading Challenge", href: "/" },
+  { label: "Reading Challenge", href: "/reading-challenge" },
   { label: "Our Top Tens", href: "/top-tens" },
   { label: "Our Libraries", href: "/libraries" },
   { label: "Book Reports", href: "/book-report" },
