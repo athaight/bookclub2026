@@ -32,6 +32,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
+import StarRating from "@/components/StarRating";
 
 type Member = { email: string; name: string };
 
@@ -64,6 +65,9 @@ function LibraryBookCard({
             <Typography variant="body2" sx={{ opacity: 0.7 }} noWrap>
               {(row.author ?? "").trim() || "—"}
             </Typography>
+            {row.rating && (
+              <StarRating value={row.rating} readOnly size="small" />
+            )}
           </Box>
 
           {canDelete && onDelete && (
@@ -103,6 +107,7 @@ export default function OurLibrariesPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formAuthor, setFormAuthor] = useState("");
   const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
+  const [formRating, setFormRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Search state
@@ -237,6 +242,7 @@ export default function OurLibrariesPage() {
     setFormTitle("");
     setFormAuthor("");
     setFormCoverUrl(null);
+    setFormRating(null);
     setSearchQuery("");
     setSearchResults([]);
     setShowResults(false);
@@ -276,6 +282,7 @@ export default function OurLibrariesPage() {
         author: author || "",
         cover_url: formCoverUrl || null,
         in_library: true,
+        rating: formRating,
       });
 
       if (error) throw new Error(error.message);
@@ -633,7 +640,14 @@ export default function OurLibrariesPage() {
             variant="outlined"
             value={formAuthor}
             onChange={(e) => setFormAuthor(e.target.value)}
+            sx={{ mb: 2 }}
           />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Rating (optional):
+            </Typography>
+            <StarRating value={formRating} onChange={setFormRating} />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDialogClose} disabled={saving}>

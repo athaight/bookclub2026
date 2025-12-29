@@ -28,6 +28,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
+import StarRating from "@/components/StarRating";
 
 const normEmail = (s: string) => s.trim().toLowerCase();
 
@@ -44,6 +45,7 @@ export default function TopTensPage() {
   const [formAuthor, setFormAuthor] = useState("");
   const [formComment, setFormComment] = useState("");
   const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
+  const [formRating, setFormRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Book search state
@@ -174,6 +176,7 @@ export default function TopTensPage() {
     setFormAuthor("");
     setFormComment("");
     setFormCoverUrl(null);
+    setFormRating(null);
   };
 
   const handleAddBook = async () => {
@@ -185,6 +188,11 @@ export default function TopTensPage() {
 
     if (!title) {
       alert("Title is required.");
+      return;
+    }
+
+    if (!formRating) {
+      alert("Rating is required for Top Ten books.");
       return;
     }
 
@@ -207,6 +215,7 @@ export default function TopTensPage() {
         cover_url: formCoverUrl || null,
         top_ten: true,
         in_library: true,
+        rating: formRating,
         // Don't set completed_at for top ten books - they're not reading completions
       });
 
@@ -217,6 +226,7 @@ export default function TopTensPage() {
       setFormAuthor("");
       setFormComment("");
       setFormCoverUrl(null);
+      setFormRating(null);
       setSearchQuery("");
       setSearchResults([]);
       setShowResults(false);
@@ -358,6 +368,9 @@ export default function TopTensPage() {
                             }
                             secondary={book.author ? `by ${book.author}` : null}
                           />
+                          {book.rating && (
+                            <StarRating value={book.rating} readOnly size="small" />
+                          )}
                           {book.comment && (
                             <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic', color: 'text.secondary' }}>
                               {book.comment}
@@ -505,7 +518,14 @@ export default function TopTensPage() {
             value={formComment}
             onChange={(e) => setFormComment(e.target.value)}
             helperText="Share your thoughts about why this book made your top ten"
+            sx={{ mb: 2 }}
           />
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              Your Rating *
+            </Typography>
+            <StarRating value={formRating} onChange={setFormRating} />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDialogClose} disabled={saving}>

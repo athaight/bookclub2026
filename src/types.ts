@@ -10,4 +10,5 @@ export type BookRow = {
   completed_at: string | null;
   top_ten?: boolean;
   in_library?: boolean;
+  rating?: number | null; // 1-5 star rating
 };

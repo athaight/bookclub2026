@@ -37,6 +37,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
+import StarRating from "@/components/StarRating";
 
 type Member = { email: string; name: string };
 
@@ -142,6 +143,7 @@ export default function HomePage() {
   const [draftComment, setDraftComment] = useState("");
   const [draftCoverUrl, setDraftCoverUrl] = useState<string | null>(null);
   const [markCompleted, setMarkCompleted] = useState(false);
+  const [draftRating, setDraftRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Book search state
@@ -279,6 +281,7 @@ export default function HomePage() {
     setDraftComment("");
     setDraftCoverUrl(null);
     setMarkCompleted(false);
+    setDraftRating(null);
     setEditingCurrent(false);
     setSearchQuery("");
     setSearchResults([]);
@@ -291,6 +294,7 @@ export default function HomePage() {
     setDraftComment((current.comment ?? "").slice(0, 200));
     setDraftCoverUrl(current.cover_url ?? null);
     setMarkCompleted(false);
+    setDraftRating(null);
     setEditingCurrent(true);
     setSearchQuery("");
     setSearchResults([]);
@@ -382,6 +386,7 @@ export default function HomePage() {
           .update({
             status: "completed",
             completed_at: new Date().toISOString(),
+            rating: draftRating,
           })
           .eq("id", current.id);
 
@@ -535,15 +540,26 @@ export default function HomePage() {
             />
 
             {!!current && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={markCompleted}
-                    onChange={(e) => setMarkCompleted(e.target.checked)}
-                  />
-                }
-                label="Mark this current book as completed"
-              />
+              <>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={markCompleted}
+                      onChange={(e) => setMarkCompleted(e.target.checked)}
+                    />
+                  }
+                  label="Mark this current book as completed"
+                />
+
+                {markCompleted && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Rating (optional):
+                    </Typography>
+                    <StarRating value={draftRating} onChange={setDraftRating} />
+                  </Box>
+                )}
+              </>
             )}
 
             <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
