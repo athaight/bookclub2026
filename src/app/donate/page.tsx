@@ -46,10 +46,10 @@ export default function DonatePage() {
         <Card sx={{ maxWidth: 345 }}>
           <CardContent>
             <Typography gutterBottom variant="h5" component="div">
-              Support Through Thrift Books
+              Support Through thriftbooks.com
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Help us build our library collection by purchasing books from thriftbooks.
+              Help us build our library collection by purchasing books from thriftbooks.com.
             </Typography>
             <Button
               variant="contained"
