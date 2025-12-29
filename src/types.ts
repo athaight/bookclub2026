@@ -10,6 +10,7 @@ export type BookRow = {
   completed_at: string | null;
   top_ten?: boolean;
   in_library?: boolean;
+  reading_challenge_year?: number | null; // Year the book was added for reading challenge
   rating?: number | null; // 1-5 star rating
 };
 

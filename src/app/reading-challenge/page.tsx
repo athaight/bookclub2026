@@ -214,12 +214,11 @@ export default function HomePage() {
   async function refresh() {
     setErr(null);
 
-    const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1).toISOString();
-    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59).toISOString();
+    // 2026 Reading Challenge
+    const challengeYear = 2026;
 
-    // Fetch current books + completed books from this year
-    // For completed books: use completed_at if set, otherwise fall back to created_at
+    // Fetch books added for this year's reading challenge
+    // Uses reading_challenge_year column to track which books belong to the challenge
     const { data, error } = await supabase
       .from("books")
       .select("*")
@@ -227,8 +226,7 @@ export default function HomePage() {
         "member_email",
         members.map((m) => m.email)
       )
-      .not("top_ten", "is", true)
-      .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear}),and(status.eq.completed,completed_at.is.null,created_at.gte.${startOfYear},created_at.lte.${endOfYear})`);
+      .eq("reading_challenge_year", challengeYear);
 
     if (error) {
       setErr(error.message);
@@ -252,6 +250,7 @@ export default function HomePage() {
   if (checkingSession) return <Typography>Loading…</Typography>;
   if (err) return <Typography color="error">DB error: {err}</Typography>;
 
+  // Library books are excluded from the query, so all fetched books can be displayed
   const byEmail: Record<string, Bucket> = {};
   for (const m of members) byEmail[m.email] = { completed: [] };
 
@@ -276,13 +275,6 @@ export default function HomePage() {
       completedCount: byEmail[m.email]?.completed.length ?? 0,
     }))
     .sort((a, b) => b.completedCount - a.completedCount);
-
-  console.log("[DEBUG] Rows fetched:", rows.length);
-  console.log("[DEBUG] Raw rows:", rows.map(r => ({ title: r.title, status: r.status, completed_at: r.completed_at, top_ten: r.top_ten, member: r.member_email })));
-  console.log("[DEBUG] byEmail:", JSON.stringify(Object.fromEntries(
-    Object.entries(byEmail).map(([k, v]) => [k, { current: v.current?.title, completedCount: v.completed.length }])
-  )));
-  console.log("[DEBUG] scored:", scored.map(s => ({ name: s.name, count: s.completedCount })));
 
   const orderedForDesktop =
     scored.length === 3 ? [scored[1], scored[0], scored[2]] : scored;
@@ -364,10 +356,14 @@ export default function HomePage() {
     setErr(null);
 
     const current = byEmail[memberEmail]?.current;
+    // 2026 Reading Challenge
+    const challengeYear = 2026;
 
     try {
       if (!current) {
         // Adding a new book - either as current or directly as completed
+        // Mark with reading_challenge_year so it appears in this year's challenge
+        // If marked as completed immediately, also add to library
         const { error } = await supabase.from("books").insert({
           member_email: memberEmail,
           status: markCompleted ? "completed" : "current",
@@ -377,6 +373,8 @@ export default function HomePage() {
           cover_url: draftCoverUrl || null,
           completed_at: markCompleted ? new Date().toISOString() : null,
           rating: markCompleted ? draftRating : null,
+          reading_challenge_year: challengeYear,
+          in_library: markCompleted ? true : false,
         });
         if (error) throw new Error(error.message);
         await refresh();
@@ -397,12 +395,14 @@ export default function HomePage() {
       if (updateErr) throw new Error(updateErr.message);
 
       if (markCompleted) {
+        // When marking as completed, also add to library
         const { error: completeErr } = await supabase
           .from("books")
           .update({
             status: "completed",
             completed_at: new Date().toISOString(),
             rating: draftRating,
+            in_library: true,
           })
           .eq("id", current.id);
 
