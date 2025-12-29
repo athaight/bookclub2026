@@ -218,6 +218,8 @@ export default function HomePage() {
     const startOfYear = new Date(currentYear, 0, 1).toISOString();
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59).toISOString();
 
+    // Fetch current books + completed books from this year
+    // For completed books: use completed_at if set, otherwise fall back to created_at
     const { data, error } = await supabase
       .from("books")
       .select("*")
@@ -226,7 +228,7 @@ export default function HomePage() {
         members.map((m) => m.email)
       )
       .not("top_ten", "is", true)
-      .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear})`);
+      .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear}),and(status.eq.completed,completed_at.is.null,created_at.gte.${startOfYear},created_at.lte.${endOfYear})`);
 
     if (error) {
       setErr(error.message);
