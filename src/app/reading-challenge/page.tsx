@@ -35,9 +35,11 @@ import SaveIcon from "@mui/icons-material/Save";
 import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
+import { useProfiles } from "@/lib/useProfiles";
 import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
+import MemberAvatar from "@/components/MemberAvatar";
 
 type Member = { email: string; name: string };
 
@@ -127,6 +129,9 @@ export default function HomePage() {
     () => getMembers().map((m) => ({ ...m, email: normEmail(m.email) })),
     []
   );
+
+  const memberEmails = useMemo(() => members.map((m) => m.email), [members]);
+  const { profiles } = useProfiles(memberEmails);
 
   const isMobile = useMediaQuery("(max-width:899px)");
 
@@ -771,16 +776,19 @@ export default function HomePage() {
                     borderColor: "divider",
                   }}
                 >
-                  <Box sx={{ width: "100%" }}>
-                    <Typography variant="h6" component="h2" sx={{ fontWeight: 800 }}>
-                      {rankLabel(rankIndex)}
-                    </Typography>
-                    <Typography variant="subtitle1" component="h2">
-                      {m.name}
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                      Current: {currentTitle}
-                    </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
+                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" component="h2" sx={{ fontWeight: 800 }}>
+                        {rankLabel(rankIndex)}
+                      </Typography>
+                      <Typography variant="subtitle1" component="h2">
+                        {m.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                        Current: {currentTitle}
+                      </Typography>
+                    </Box>
                   </Box>
                 </AccordionSummary>
 
@@ -815,13 +823,16 @@ export default function HomePage() {
               {orderedForDesktop.map((m) => {
                 const rankIndex = scored.findIndex((s) => s.email === m.email);
                 return (
-                  <Box key={m.email}>
-                    <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mb: 0.5 }}>
-                      {rankLabel(rankIndex)}
-                    </Typography>
-                    <Typography variant="body1" component="h2" sx={{ color: "text.secondary" }}>
-                      {m.name}
-                    </Typography>
+                  <Box key={m.email} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="large" />
+                    <Box>
+                      <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mb: 0.5 }}>
+                        {rankLabel(rankIndex)}
+                      </Typography>
+                      <Typography variant="body1" component="h2" sx={{ color: "text.secondary" }}>
+                        {m.name}
+                      </Typography>
+                    </Box>
                   </Box>
                 );
               })}

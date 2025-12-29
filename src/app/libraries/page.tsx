@@ -31,9 +31,11 @@ import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
+import { useProfiles } from "@/lib/useProfiles";
 import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
+import MemberAvatar from "@/components/MemberAvatar";
 
 type Member = { email: string; name: string };
 
@@ -112,6 +114,9 @@ export default function OurLibrariesPage() {
     () => getMembers().map((m) => ({ ...m, email: normEmail(m.email) })),
     []
   );
+
+  const memberEmails = useMemo(() => members.map((m) => m.email), [members]);
+  const { profiles } = useProfiles(memberEmails);
 
   const isMobile = useMediaQuery("(max-width:899px)");
 
@@ -423,9 +428,12 @@ export default function OurLibrariesPage() {
             px: 1,
           }}
         >
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-            {m.name}&apos;s Library
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
+            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+              {m.name}&apos;s Library
+            </Typography>
+          </Box>
           {isOwner && (
             <IconButton
               onClick={() => setDialogOpen(true)}
@@ -544,13 +552,16 @@ export default function OurLibrariesPage() {
                     borderColor: "divider",
                   }}
                 >
-                  <Box sx={{ width: "100%" }}>
-                    <Typography variant="h6" component="h2">
-                      {m.name}&apos;s Library
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                      {books.length} {books.length === 1 ? "book" : "books"}
-                    </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
+                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" component="h2">
+                        {m.name}&apos;s Library
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                        {books.length} {books.length === 1 ? "book" : "books"}
+                      </Typography>
+                    </Box>
                   </Box>
                 </AccordionSummary>
 
