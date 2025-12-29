@@ -6,7 +6,7 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "Book Bros Book Club 2026",
+  title: "Book Bros Book Club",
   description: "Book club tracker",
 };
 

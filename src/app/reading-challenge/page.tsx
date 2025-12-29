@@ -730,6 +730,9 @@ export default function HomePage() {
         <Typography variant="h3" component="h1" gutterBottom>
           Reading Challenge
         </Typography>
+        <Typography variant="h6" component="p" sx={{ mb: 2 }}>
+          2026
+        </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: 'auto', color: 'text.secondary' }}>
           Our 2026 challenge is to see who reads the most books this year. Here, you&apos;ll see what we&apos;re currently reading and what we&apos;ve finished to determine which one of us is a true Bibliophile (1st place), or could be considered a Bookworm (2nd place), or just Bookish (3rd place).
         </Typography>

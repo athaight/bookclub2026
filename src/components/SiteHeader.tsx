@@ -16,7 +16,7 @@ export default function SiteHeader() {
           variant="h6"
           sx={{ textDecoration: "none", color: "inherit", fontWeight: 700 }}
         >
-          Book Bros Book Club 2026
+          Book Bros Book Club
         </Typography>
 
         <Box sx={{ flex: 1 }} />
