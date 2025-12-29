@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
+import { useState, useMemo, useEffect } from "react";
 import {
   Avatar,
   Box,
+  Card,
+  CardContent,
+  Chip,
   Container,
   Divider,
-  Paper,
   Typography,
 } from "@mui/material";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
+import { supabase } from "@/lib/supabaseClient";
+import { BookRow } from "@/types";
 
 type Member = { email: string; name: string };
 
@@ -33,6 +38,78 @@ export default function ProfilesPage() {
 
   const { profiles } = useProfiles(members.map((m) => m.email));
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [memberBooks, setMemberBooks] = useState<Record<string, BookRow[]>>({});
+  const [loading, setLoading] = useState(false);
+
+  // Fetch all books for all members
+  useEffect(() => {
+    async function fetchBooks() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("books")
+        .select("*")
+        .in("member_email", members.map((m) => m.email));
+
+      if (!error && data) {
+        const grouped: Record<string, BookRow[]> = {};
+        for (const m of members) {
+          grouped[m.email] = data.filter((b) => b.member_email === m.email);
+        }
+        setMemberBooks(grouped);
+      }
+      setLoading(false);
+    }
+
+    if (members.length > 0) {
+      fetchBooks();
+    }
+  }, [members]);
+
+  // Calculate stats for selected member
+  const stats = useMemo(() => {
+    if (!selectedMember) return null;
+
+    const books = memberBooks[selectedMember.email] || [];
+    
+    // Reading Challenge stats (2026)
+    const challengeBooks = books.filter((b) => b.reading_challenge_year === 2026);
+    const currentBook = challengeBooks.find((b) => b.status === "current");
+    const completedChallengeBooks = challengeBooks.filter((b) => b.status === "completed");
+    
+    // Calculate ranking across all members
+    const memberScores = members.map((m) => {
+      const mBooks = memberBooks[m.email] || [];
+      const mChallengeBooks = mBooks.filter((b) => b.reading_challenge_year === 2026 && b.status === "completed");
+      return { email: m.email, completedCount: mChallengeBooks.length };
+    }).sort((a, b) => b.completedCount - a.completedCount);
+    
+    const rankIndex = memberScores.findIndex((s) => s.email === selectedMember.email);
+    const rankLabel = rankIndex === 0 ? "Bibliophile" : rankIndex === 1 ? "Bookworm" : "Bookish";
+    
+    // Library stats
+    const libraryBooks = books.filter((b) => b.in_library);
+    
+    // Genre counts
+    const genreCounts: Record<string, number> = {};
+    for (const book of libraryBooks) {
+      if (book.genre) {
+        genreCounts[book.genre] = (genreCounts[book.genre] || 0) + 1;
+      }
+    }
+    
+    // Sort genres by count
+    const sortedGenres = Object.entries(genreCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10); // Top 10 genres
+
+    return {
+      currentBook,
+      booksRead: completedChallengeBooks.length,
+      rankLabel,
+      totalLibraryBooks: libraryBooks.length,
+      genres: sortedGenres,
+    };
+  }, [selectedMember, memberBooks]);
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -88,9 +165,9 @@ export default function ProfilesPage() {
               <Avatar
                 src={avatarUrl || undefined}
                 sx={{
-                  width: 250,
-                  height: 250,
-                  fontSize: 80,
+                  width: { xs: 120, sm: 180, md: 250 },
+                  height: { xs: 120, sm: 180, md: 250 },
+                  fontSize: { xs: 40, sm: 60, md: 80 },
                   border: isSelected ? "4px solid #667eea" : "4px solid transparent",
                   boxShadow: isSelected
                     ? "0 8px 32px rgba(102, 126, 234, 0.4)"
@@ -107,6 +184,7 @@ export default function ProfilesPage() {
                   mt: 2,
                   fontWeight: 600,
                   color: isSelected ? "primary.main" : "text.primary",
+                  fontSize: { xs: "1.1rem", sm: "1.5rem" },
                 }}
               >
                 {m.name}
@@ -120,32 +198,165 @@ export default function ProfilesPage() {
       <Divider sx={{ my: 4 }} />
 
       {/* Instructions Header */}
-      <Typography
-        variant="h6"
-        align="center"
-        sx={{ color: "text.secondary", mb: 4 }}
-      >
-        Click a user to see their stats
-      </Typography>
-
-      {/* Stats Section (placeholder) */}
-      {selectedMember && (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 4,
-            backgroundColor: "grey.50",
-            borderRadius: 2,
-            minHeight: 200,
-          }}
+      {!selectedMember && (
+        <Typography
+          variant="h6"
+          align="center"
+          sx={{ color: "text.secondary", mb: 4 }}
         >
-          <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-            {selectedMember.name}&apos;s Stats
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Stats coming soon...
-          </Typography>
-        </Paper>
+          Click a user to see their stats
+        </Typography>
+      )}
+
+      {/* Stats Section */}
+      {selectedMember && stats && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {/* Reading Challenge Card */}
+          <Card elevation={2}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                <MenuBookIcon color="primary" />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  2026 Reading Challenge
+                </Typography>
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                Current ranking:
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
+                {stats.rankLabel}
+              </Typography>
+              
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                {/* Current Book */}
+                <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 2 }}>
+                  {stats.currentBook ? (
+                    <>
+                      {stats.currentBook.cover_url && (
+                        <Avatar
+                          src={stats.currentBook.cover_url}
+                          variant="rounded"
+                          sx={{ width: 60, height: 90, flexShrink: 0 }}
+                        />
+                      )}
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Currently Reading
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          {stats.currentBook.title}
+                        </Typography>
+                        {stats.currentBook.author && (
+                          <Typography variant="body2" color="text.secondary">
+                            by {stats.currentBook.author}
+                          </Typography>
+                        )}
+                      </Box>
+                    </>
+                  ) : (
+                    <Typography variant="body1" color="text.secondary">
+                      No current book
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Vertical Divider */}
+                <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+
+                {/* Books Read Count */}
+                <Box sx={{ textAlign: "center", minWidth: 100 }}>
+                  <Typography
+                    variant="h2"
+                    sx={{
+                      fontWeight: 700,
+                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    {stats.booksRead}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    books read
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Library Stats Card */}
+          <Card elevation={2}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                <LibraryBooksIcon color="primary" />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Library Stats
+                </Typography>
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Total Books
+                </Typography>
+                <Typography
+                  variant="h3"
+                  sx={{
+                    fontWeight: 700,
+                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  {stats.totalLibraryBooks}
+                </Typography>
+              </Box>
+
+              {/* Genre Chips */}
+              {stats.genres.length > 0 && (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Genres
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {stats.genres.map(([genre, count]) => (
+                      <Chip
+                        key={genre}
+                        label={`${genre}: ${count}`}
+                        size="small"
+                        sx={{
+                          backgroundColor: "rgba(102, 126, 234, 0.1)",
+                          color: "primary.main",
+                          fontWeight: 500,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {stats.genres.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No genre data available yet. Genres are captured when new books are added.
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {loading && selectedMember && (
+        <Typography align="center" color="text.secondary">
+          Loading stats...
+        </Typography>
       )}
     </Container>
   );

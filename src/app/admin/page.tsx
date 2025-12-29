@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import PersonIcon from "@mui/icons-material/Person";
+import ArticleIcon from "@mui/icons-material/Article";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
@@ -173,6 +174,26 @@ export default function AdminPage() {
           }}
         >
           Profile
+        </Button>
+
+        <Button
+          variant="outlined"
+          size="large"
+          startIcon={<ArticleIcon />}
+          onClick={() => router.push("/book-report")}
+          sx={{
+            px: 4,
+            py: 1.5,
+            fontSize: "1.1rem",
+            borderColor: "#667eea",
+            color: "#667eea",
+            "&:hover": {
+              borderColor: "#764ba2",
+              backgroundColor: "rgba(102, 126, 234, 0.04)",
+            },
+          }}
+        >
+          Book Reports
         </Button>
       </Box>
     </Box>

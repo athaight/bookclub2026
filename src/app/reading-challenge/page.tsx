@@ -148,6 +148,7 @@ export default function HomePage() {
   const [draftAuthor, setDraftAuthor] = useState("");
   const [draftComment, setDraftComment] = useState("");
   const [draftCoverUrl, setDraftCoverUrl] = useState<string | null>(null);
+  const [draftGenre, setDraftGenre] = useState<string | null>(null);
   const [markCompleted, setMarkCompleted] = useState(false);
   const [draftRating, setDraftRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -286,6 +287,7 @@ export default function HomePage() {
     setDraftAuthor("");
     setDraftComment("");
     setDraftCoverUrl(null);
+    setDraftGenre(null);
     setMarkCompleted(false);
     setDraftRating(null);
     setEditingCurrent(false);
@@ -334,6 +336,7 @@ export default function HomePage() {
     setDraftTitle(book.title);
     setDraftAuthor(book.author);
     setDraftCoverUrl(book.coverUrl || null);
+    setDraftGenre(book.genre || null);
     setSearchResults([]);
     setShowResults(false);
     setSearchQuery("");
@@ -372,6 +375,7 @@ export default function HomePage() {
           author: author || "",
           comment: comment || "",
           cover_url: draftCoverUrl || null,
+          genre: draftGenre || null,
           completed_at: markCompleted ? new Date().toISOString() : null,
           rating: markCompleted ? draftRating : null,
           reading_challenge_year: challengeYear,

@@ -139,6 +139,7 @@ export default function OurLibrariesPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formAuthor, setFormAuthor] = useState("");
   const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
+  const [formGenre, setFormGenre] = useState<string | null>(null);
   const [formRating, setFormRating] = useState<number | null>(null);
   const [formComment, setFormComment] = useState("");
   const [formTopTen, setFormTopTen] = useState(false);
@@ -285,6 +286,7 @@ export default function OurLibrariesPage() {
     setFormTitle(book.title);
     setFormAuthor(book.author);
     setFormCoverUrl(book.coverUrl || null);
+    setFormGenre(book.genre || null);
     setSearchResults([]);
     setShowResults(false);
     setSearchQuery("");
@@ -296,6 +298,7 @@ export default function OurLibrariesPage() {
     setFormTitle("");
     setFormAuthor("");
     setFormCoverUrl(null);
+    setFormGenre(null);
     setFormRating(null);
     setFormComment("");
     setFormTopTen(false);
@@ -397,6 +400,7 @@ export default function OurLibrariesPage() {
           title,
           author: author || "",
           cover_url: formCoverUrl || null,
+          genre: formGenre || null,
           in_library: true,
           top_ten: formTopTen,
           rating: formRating,

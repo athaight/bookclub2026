@@ -179,6 +179,7 @@ export default function TopTensPage() {
   const [formAuthor, setFormAuthor] = useState("");
   const [formComment, setFormComment] = useState("");
   const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
+  const [formGenre, setFormGenre] = useState<string | null>(null);
   const [formRating, setFormRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -325,6 +326,7 @@ export default function TopTensPage() {
     setFormTitle(book.title);
     setFormAuthor(book.author);
     setFormCoverUrl(book.coverUrl || null);
+    setFormGenre(book.genre || null);
     setSearchResults([]);
     setShowResults(false);
     setSearchQuery("");
@@ -340,6 +342,7 @@ export default function TopTensPage() {
     setFormAuthor("");
     setFormComment("");
     setFormCoverUrl(null);
+    setFormGenre(null);
     setFormRating(null);
   };
 
@@ -413,6 +416,7 @@ export default function TopTensPage() {
         author: author || "",
         comment: comment || "",
         cover_url: formCoverUrl || null,
+        genre: formGenre || null,
         top_ten: true,
         in_library: true,
         rating: formRating,
@@ -452,6 +456,7 @@ export default function TopTensPage() {
         author: formAuthor.trim() || "",
         comment: formComment.trim() || "",
         cover_url: formCoverUrl || null,
+        genre: formGenre || null,
         top_ten: true,
         in_library: true,
         rating: formRating,
