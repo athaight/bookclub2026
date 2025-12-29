@@ -27,6 +27,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
@@ -40,45 +41,65 @@ const normEmail = (s: string) => s.trim().toLowerCase();
 
 function LibraryBookCard({
   row,
-  canDelete,
+  isOwner,
   onDelete,
+  onEdit,
 }: {
   row: BookRow;
-  canDelete?: boolean;
+  isOwner?: boolean;
   onDelete?: (row: BookRow) => void;
+  onEdit?: (row: BookRow) => void;
 }) {
   return (
     <Card sx={{ mb: 1 }}>
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
           {row.cover_url && (
             <Avatar
               src={row.cover_url}
               variant="rounded"
-              sx={{ width: 32, height: 48, flexShrink: 0 }}
+              sx={{ width: 40, height: 60, flexShrink: 0, mt: 0.5 }}
             />
           )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body1" component="h3" noWrap sx={{ fontWeight: 500 }}>
+            <Typography variant="body1" component="h3" sx={{ fontWeight: 500 }}>
               {(row.title ?? "").trim() || "—"}
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.7 }} noWrap>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>
               {(row.author ?? "").trim() || "—"}
             </Typography>
             {row.rating && (
               <StarRating value={row.rating} readOnly size="small" />
             )}
+            {row.comment && (
+              <Typography variant="body2" sx={{ mt: 0.5, fontStyle: "italic", color: "text.secondary" }}>
+                {row.comment}
+              </Typography>
+            )}
           </Box>
 
-          {canDelete && onDelete && (
-            <IconButton
-              aria-label="delete"
-              onClick={() => onDelete(row)}
-              size="small"
-              sx={{ color: "error.main" }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+          {isOwner && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {onEdit && (
+                <IconButton
+                  aria-label="edit"
+                  onClick={() => onEdit(row)}
+                  size="small"
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              )}
+              {onDelete && (
+                <IconButton
+                  aria-label="delete"
+                  onClick={() => onDelete(row)}
+                  size="small"
+                  sx={{ color: "error.main" }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              )}
+            </Box>
           )}
         </Box>
       </CardContent>
@@ -104,10 +125,12 @@ export default function OurLibrariesPage() {
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<BookRow | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formAuthor, setFormAuthor] = useState("");
   const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
   const [formRating, setFormRating] = useState<number | null>(null);
+  const [formComment, setFormComment] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Search state
@@ -239,58 +262,90 @@ export default function OurLibrariesPage() {
 
   function handleDialogClose() {
     setDialogOpen(false);
+    setEditingBook(null);
     setFormTitle("");
     setFormAuthor("");
     setFormCoverUrl(null);
     setFormRating(null);
+    setFormComment("");
     setSearchQuery("");
     setSearchResults([]);
     setShowResults(false);
   }
 
-  async function handleAddBook() {
+  function handleEditClick(book: BookRow) {
+    setEditingBook(book);
+    setFormTitle(book.title || "");
+    setFormAuthor(book.author || "");
+    setFormCoverUrl(book.cover_url || null);
+    setFormRating(book.rating || null);
+    setFormComment(book.comment || "");
+    setDialogOpen(true);
+  }
+
+  async function handleSaveBook() {
     if (!authedEmail) return;
 
     const title = formTitle.trim();
     const author = formAuthor.trim();
+    const comment = formComment.trim();
 
     if (!title) {
       alert("Title is required.");
       return;
     }
 
-    // Check for duplicates
-    const existingBook = libraryBooks.find(
-      (b) =>
-        b.member_email === authedEmail &&
-        b.title.toLowerCase() === title.toLowerCase() &&
-        (b.author || "").toLowerCase() === author.toLowerCase()
-    );
-
-    if (existingBook) {
-      alert("This book is already in your library.");
-      return;
-    }
-
     setSaving(true);
 
     try {
-      const { error } = await supabase.from("books").insert({
-        member_email: authedEmail,
-        status: "completed",
-        title,
-        author: author || "",
-        cover_url: formCoverUrl || null,
-        in_library: true,
-        rating: formRating,
-      });
+      if (editingBook) {
+        // Update existing book
+        const { error } = await supabase
+          .from("books")
+          .update({
+            title,
+            author: author || "",
+            cover_url: formCoverUrl || null,
+            rating: formRating,
+            comment: comment || "",
+          })
+          .eq("id", editingBook.id);
 
-      if (error) throw new Error(error.message);
+        if (error) throw new Error(error.message);
+      } else {
+        // Check for duplicates when adding
+        const existingBook = libraryBooks.find(
+          (b) =>
+            b.member_email === authedEmail &&
+            b.title.toLowerCase() === title.toLowerCase() &&
+            (b.author || "").toLowerCase() === author.toLowerCase()
+        );
+
+        if (existingBook) {
+          alert("This book is already in your library.");
+          setSaving(false);
+          return;
+        }
+
+        // Insert new book
+        const { error } = await supabase.from("books").insert({
+          member_email: authedEmail,
+          status: "completed",
+          title,
+          author: author || "",
+          cover_url: formCoverUrl || null,
+          in_library: true,
+          rating: formRating,
+          comment: comment || "",
+        });
+
+        if (error) throw new Error(error.message);
+      }
 
       handleDialogClose();
       await refresh();
     } catch (e) {
-      alert(`Error adding book: ${e instanceof Error ? e.message : "Unknown error"}`);
+      alert(`Error saving book: ${e instanceof Error ? e.message : "Unknown error"}`);
     } finally {
       setSaving(false);
     }
@@ -384,8 +439,9 @@ export default function OurLibrariesPage() {
             <LibraryBookCard
               key={book.id}
               row={book}
-              canDelete={isOwner}
+              isOwner={isOwner}
               onDelete={handleDeleteClick}
+              onEdit={handleEditClick}
             />
           ))
         ) : (
@@ -421,8 +477,9 @@ export default function OurLibrariesPage() {
             <LibraryBookCard
               key={book.id}
               row={book}
-              canDelete={isOwner}
+              isOwner={isOwner}
               onDelete={handleDeleteClick}
+              onEdit={handleEditClick}
             />
           ))
         ) : (
@@ -509,9 +566,9 @@ export default function OurLibrariesPage() {
         </Box>
       )}
 
-      {/* Add Book Dialog */}
+      {/* Add/Edit Book Dialog */}
       <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Add to Your Library</DialogTitle>
+        <DialogTitle>{editingBook ? "Edit Book" : "Add to Your Library"}</DialogTitle>
         <DialogContent>
           {/* Book Search Section */}
           <Box sx={{ mb: 3, mt: 1 }}>
@@ -642,6 +699,18 @@ export default function OurLibrariesPage() {
             onChange={(e) => setFormAuthor(e.target.value)}
             sx={{ mb: 2 }}
           />
+          <TextField
+            margin="dense"
+            label="Notes / Comments (optional)"
+            fullWidth
+            multiline
+            rows={3}
+            variant="outlined"
+            value={formComment}
+            onChange={(e) => setFormComment(e.target.value)}
+            helperText="Share your thoughts about this book"
+            sx={{ mb: 2 }}
+          />
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Typography variant="body2" color="text.secondary">
               Rating (optional):
@@ -653,8 +722,8 @@ export default function OurLibrariesPage() {
           <Button onClick={handleDialogClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleAddBook} variant="contained" disabled={saving}>
-            {saving ? "Adding..." : "Add to Library"}
+          <Button onClick={handleSaveBook} variant="contained" disabled={saving}>
+            {saving ? "Saving..." : editingBook ? "Save Changes" : "Add to Library"}
           </Button>
         </DialogActions>
       </Dialog>
