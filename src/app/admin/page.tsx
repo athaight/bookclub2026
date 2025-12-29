@@ -153,6 +153,7 @@ export default function AdminPage() {
       }
 
       const allowed = members.some((m) => m.email === email);
+      console.log("[DEBUG] Login check:", { email, members: members.map(m => m.email), allowed });
       if (!allowed) {
         await supabase.auth.signOut({ scope: 'local' });
         setCheckingSession(false);
