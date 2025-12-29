@@ -37,7 +37,6 @@ export function useProfiles(memberEmails: string[]) {
       for (const profile of data || []) {
         profileMap[profile.email.toLowerCase()] = profile;
       }
-      console.log("[DEBUG] Profiles fetched:", profileMap);
 
       setProfiles(profileMap);
       setLoading(false);

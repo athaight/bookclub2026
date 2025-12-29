@@ -163,9 +163,34 @@ export default function ProfilePage() {
 
       // Get public URL
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const newAvatarUrl = urlData.publicUrl;
 
-      setAvatarUrl(urlData.publicUrl);
-      setSuccess("Image uploaded! Click Save to update your profile.");
+      setAvatarUrl(newAvatarUrl);
+
+      // Auto-save the avatar URL to the profile
+      const profileData = {
+        email: authedEmail,
+        display_name: displayName.trim() || authedEmail,
+        avatar_url: newAvatarUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (profile) {
+        const { error: saveError } = await supabase
+          .from("profiles")
+          .update({ avatar_url: newAvatarUrl, updated_at: new Date().toISOString() })
+          .eq("email", authedEmail);
+        if (saveError) throw new Error(saveError.message);
+      } else {
+        const { error: saveError } = await supabase.from("profiles").insert({
+          ...profileData,
+          created_at: new Date().toISOString(),
+        });
+        if (saveError) throw new Error(saveError.message);
+        setProfile(profileData as ProfileRow);
+      }
+
+      setSuccess("Profile picture updated!");
     } catch (e) {
       setError(`Error uploading image: ${e instanceof Error ? e.message : "Unknown error"}`);
     } finally {
