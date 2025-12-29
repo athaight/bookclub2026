@@ -11,6 +11,8 @@ import {
   Divider,
   Typography,
 } from "@mui/material";
+import { BarChart } from "@mui/x-charts/BarChart";
+import { PieChart } from "@mui/x-charts/PieChart";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import { getMembers } from "@/lib/members";
@@ -76,6 +78,19 @@ export default function ProfilesPage() {
     const currentBook = challengeBooks.find((b) => b.status === "current");
     const completedChallengeBooks = challengeBooks.filter((b) => b.status === "completed");
     
+    // Calculate monthly reading stats
+    const monthlyData = Array(12).fill(0);
+    for (const book of completedChallengeBooks) {
+      if (book.completed_at) {
+        const completedDate = new Date(book.completed_at);
+        // Only count books completed in 2026
+        if (completedDate.getFullYear() === 2026) {
+          const month = completedDate.getMonth(); // 0-11
+          monthlyData[month]++;
+        }
+      }
+    }
+    
     // Calculate ranking across all members
     const memberScores = members.map((m) => {
       const mBooks = memberBooks[m.email] || [];
@@ -106,10 +121,11 @@ export default function ProfilesPage() {
       currentBook,
       booksRead: completedChallengeBooks.length,
       rankLabel,
+      monthlyData,
       totalLibraryBooks: libraryBooks.length,
       genres: sortedGenres,
     };
-  }, [selectedMember, memberBooks]);
+  }, [selectedMember, memberBooks, members]);
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -289,6 +305,30 @@ export default function ProfilesPage() {
                   </Typography>
                 </Box>
               </Box>
+
+              {/* Monthly Reading Chart */}
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                Books Completed by Month
+              </Typography>
+              <Box sx={{ width: "100%", height: 250 }}>
+                <BarChart
+                  xAxis={[
+                    {
+                      scaleType: "band",
+                      data: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+                    },
+                  ]}
+                  series={[
+                    {
+                      data: stats.monthlyData,
+                      color: "#667eea",
+                    },
+                  ]}
+                  height={250}
+                  margin={{ top: 20, bottom: 30, left: 40, right: 20 }}
+                />
+              </Box>
             </CardContent>
           </Card>
 
@@ -320,28 +360,80 @@ export default function ProfilesPage() {
                 </Typography>
               </Box>
 
-              {/* Genre Chips */}
+              {/* Genre Pie Chart */}
               {stats.genres.length > 0 && (
-                <Box>
+                <Box sx={{ mb: "24px" }}>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Genres
+                    Genre Distribution
                   </Typography>
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                    {stats.genres.map(([genre, count]) => (
-                      <Chip
-                        key={genre}
-                        label={`${genre}: ${count}`}
-                        size="small"
-                        sx={{
-                          backgroundColor: "rgba(102, 126, 234, 0.1)",
-                          color: "primary.main",
-                          fontWeight: 500,
-                        }}
-                      />
-                    ))}
+                  
+                  {/* Pie Chart - centered, no legend */}
+                  <Box sx={{ width: "100%", height: 200, display: "flex", justifyContent: "center" }}>
+                    <PieChart
+                      series={[
+                        {
+                          data: stats.genres.map(([genre, count], index) => ({
+                            id: index,
+                            value: count,
+                          })),
+                          innerRadius: 25,
+                          outerRadius: 80,
+                          paddingAngle: 2,
+                          cornerRadius: 5,
+                        },
+                      ]}
+                      width={200}
+                      height={200}
+                    />
+                  </Box>
+                  
+                  {/* Custom Legend - wraps naturally */}
+                  <Box 
+                    sx={{ 
+                      display: "flex", 
+                      flexWrap: "wrap", 
+                      gap: 1,
+                      justifyContent: "center",
+                      mt: "24px",
+                    }}
+                  >
+                    {stats.genres.map(([genre, count], index) => {
+                      const colors = [
+                        "#02b2af", "#2e96ff", "#b800d8", "#60009b", "#2731c8",
+                        "#03008d", "#ff6f00", "#4caf50", "#f44336", "#9c27b0"
+                      ];
+                      return (
+                        <Box 
+                          key={genre} 
+                          sx={{ 
+                            display: "flex", 
+                            alignItems: "center", 
+                            gap: 0.5,
+                            px: 1,
+                            py: 0.5,
+                          }}
+                        >
+                          <Box 
+                            sx={{ 
+                              width: 12, 
+                              height: 12, 
+                              borderRadius: "50%", 
+                              backgroundColor: colors[index % colors.length],
+                              flexShrink: 0,
+                            }} 
+                          />
+                          <Typography variant="body2" sx={{ fontSize: 12 }}>
+                            {genre} ({count})
+                          </Typography>
+                        </Box>
+                      );
+                    })}
                   </Box>
                 </Box>
               )}
+
+              {/* Genre Chips */}
+              {/* Genre Chips removed: legend now shows the count */}
 
               {stats.genres.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
