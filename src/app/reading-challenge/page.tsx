@@ -354,13 +354,16 @@ export default function HomePage() {
 
     try {
       if (!current) {
+        // Adding a new book - either as current or directly as completed
         const { error } = await supabase.from("books").insert({
           member_email: memberEmail,
-          status: "current",
+          status: markCompleted ? "completed" : "current",
           title,
           author: author || "",
           comment: comment || "",
           cover_url: draftCoverUrl || null,
+          completed_at: markCompleted ? new Date().toISOString() : null,
+          rating: markCompleted ? draftRating : null,
         });
         if (error) throw new Error(error.message);
         await refresh();
@@ -539,27 +542,23 @@ export default function HomePage() {
               fullWidth
             />
 
-            {!!current && (
-              <>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={markCompleted}
-                      onChange={(e) => setMarkCompleted(e.target.checked)}
-                    />
-                  }
-                  label="Mark this current book as completed"
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={markCompleted}
+                  onChange={(e) => setMarkCompleted(e.target.checked)}
                 />
+              }
+              label={current ? "Mark this current book as completed" : "Add as completed (already finished reading)"}
+            />
 
-                {markCompleted && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 4 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Rating (optional):
-                    </Typography>
-                    <StarRating value={draftRating} onChange={setDraftRating} />
-                  </Box>
-                )}
-              </>
+            {markCompleted && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 4 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Rating (optional):
+                </Typography>
+                <StarRating value={draftRating} onChange={setDraftRating} />
+              </Box>
             )}
 
             <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
