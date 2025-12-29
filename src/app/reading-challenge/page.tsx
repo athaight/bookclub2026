@@ -275,6 +275,12 @@ export default function HomePage() {
     }))
     .sort((a, b) => b.completedCount - a.completedCount);
 
+  console.log("[DEBUG] Rows fetched:", rows.length);
+  console.log("[DEBUG] byEmail:", JSON.stringify(Object.fromEntries(
+    Object.entries(byEmail).map(([k, v]) => [k, { current: v.current?.title, completedCount: v.completed.length }])
+  )));
+  console.log("[DEBUG] scored:", scored.map(s => ({ name: s.name, count: s.completedCount })));
+
   const orderedForDesktop =
     scored.length === 3 ? [scored[1], scored[0], scored[2]] : scored;
   const orderedForMobile = scored;
