@@ -12,3 +12,11 @@ export type BookRow = {
   in_library?: boolean;
   rating?: number | null; // 1-5 star rating
 };
+
+export type ProfileRow = {
+  email: string;
+  display_name: string;
+  avatar_url?: string | null;
+  created_at: string;
+  updated_at: string;
+};
