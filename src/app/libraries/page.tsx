@@ -10,12 +10,15 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
+  FormControlLabel,
   IconButton,
   List,
   ListItemButton,
@@ -125,6 +128,7 @@ export default function OurLibrariesPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [libraryBooks, setLibraryBooks] = useState<BookRow[]>([]);
+  const [topTenBooks, setTopTenBooks] = useState<BookRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -136,7 +140,12 @@ export default function OurLibrariesPage() {
   const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
   const [formRating, setFormRating] = useState<number | null>(null);
   const [formComment, setFormComment] = useState("");
+  const [formTopTen, setFormTopTen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Top Ten conflict dialogs
+  const [topTenFullDialogOpen, setTopTenFullDialogOpen] = useState(false);
+  const [alreadyTopTenDialogOpen, setAlreadyTopTenDialogOpen] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,26 +214,41 @@ export default function OurLibrariesPage() {
     setErr(null);
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("books")
-      .select("*")
-      .eq("in_library", true)
-      .in("member_email", members.map((m) => m.email))
-      .order("title", { ascending: true });
+    // Fetch library books and top ten books in parallel
+    const [libraryResult, topTenResult] = await Promise.all([
+      supabase
+        .from("books")
+        .select("*")
+        .eq("in_library", true)
+        .in("member_email", members.map((m) => m.email))
+        .order("title", { ascending: true }),
+      supabase
+        .from("books")
+        .select("*")
+        .eq("top_ten", true)
+        .in("member_email", members.map((m) => m.email))
+    ]);
 
-    if (error) {
-      setErr(error.message);
+    if (libraryResult.error) {
+      setErr(libraryResult.error.message);
       setLibraryBooks([]);
+      setTopTenBooks([]);
       setLoading(false);
       return;
     }
 
-    const normalized = ((data ?? []) as BookRow[]).map((r) => ({
+    const normalizedLibrary = ((libraryResult.data ?? []) as BookRow[]).map((r) => ({
       ...r,
       member_email: normEmail(r.member_email),
     }));
 
-    setLibraryBooks(normalized);
+    const normalizedTopTen = ((topTenResult.data ?? []) as BookRow[]).map((r) => ({
+      ...r,
+      member_email: normEmail(r.member_email),
+    }));
+
+    setLibraryBooks(normalizedLibrary);
+    setTopTenBooks(normalizedTopTen);
     setLoading(false);
   }
 
@@ -273,6 +297,7 @@ export default function OurLibrariesPage() {
     setFormCoverUrl(null);
     setFormRating(null);
     setFormComment("");
+    setFormTopTen(false);
     setSearchQuery("");
     setSearchResults([]);
     setShowResults(false);
@@ -284,6 +309,7 @@ export default function OurLibrariesPage() {
     setFormAuthor(book.author || "");
     setFormCoverUrl(book.cover_url || null);
     setFormRating(book.rating || null);
+    setFormTopTen(book.top_ten || false);
     setFormComment(book.comment || "");
     setDialogOpen(true);
   }
@@ -300,6 +326,36 @@ export default function OurLibrariesPage() {
       return;
     }
 
+    // If adding to Top Ten, validate
+    if (formTopTen && authedEmail) {
+      const userTopTen = topTenBooks.filter((b) => b.member_email === authedEmail);
+      
+      // Check if top ten is full (only for new books or books not already in top ten)
+      if (userTopTen.length >= 10 && (!editingBook || !editingBook.top_ten)) {
+        setTopTenFullDialogOpen(true);
+        return;
+      }
+
+      // Check if book already exists in top ten (for new books only)
+      if (!editingBook) {
+        const alreadyInTopTen = userTopTen.find(
+          (b) =>
+            b.title.toLowerCase() === title.toLowerCase() &&
+            (b.author || "").toLowerCase() === author.toLowerCase()
+        );
+        if (alreadyInTopTen) {
+          setAlreadyTopTenDialogOpen(true);
+          return;
+        }
+      }
+
+      // Rating is required for top ten
+      if (!formRating) {
+        alert("Rating is required for Top Ten books.");
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -313,6 +369,7 @@ export default function OurLibrariesPage() {
             cover_url: formCoverUrl || null,
             rating: formRating,
             comment: comment || "",
+            top_ten: formTopTen,
           })
           .eq("id", editingBook.id);
 
@@ -340,6 +397,7 @@ export default function OurLibrariesPage() {
           author: author || "",
           cover_url: formCoverUrl || null,
           in_library: true,
+          top_ten: formTopTen,
           rating: formRating,
           comment: comment || "",
         });
@@ -729,12 +787,21 @@ export default function OurLibrariesPage() {
             helperText="Share your thoughts about this book"
             sx={{ mb: 2 }}
           />
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Rating (optional):
+              Rating{formTopTen ? " (required for Top Ten)" : " (optional)"}:
             </Typography>
             <StarRating value={formRating} onChange={setFormRating} />
           </Box>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formTopTen}
+                onChange={(e) => setFormTopTen(e.target.checked)}
+              />
+            }
+            label="Add to my Top Ten"
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDialogClose} disabled={saving}>
@@ -742,6 +809,36 @@ export default function OurLibrariesPage() {
           </Button>
           <Button onClick={handleSaveBook} variant="contained" disabled={saving}>
             {saving ? "Saving..." : editingBook ? "Save Changes" : "Add to Library"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Top Ten Full Dialog */}
+      <Dialog open={topTenFullDialogOpen} onClose={() => setTopTenFullDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Top Ten is Full</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You already have 10 books in your Top Ten list. Please remove a book from your Top Ten first before adding another.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTopTenFullDialogOpen(false)} variant="contained">
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Already in Top Ten Dialog */}
+      <Dialog open={alreadyTopTenDialogOpen} onClose={() => setAlreadyTopTenDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Already in Top Ten</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This book is already in your Top Ten list.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAlreadyTopTenDialogOpen(false)} variant="contained">
+            OK
           </Button>
         </DialogActions>
       </Dialog>

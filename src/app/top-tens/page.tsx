@@ -111,6 +111,7 @@ export default function TopTensPage() {
   const isMobile = useMediaQuery("(max-width:899px)");
 
   const [topTenBooks, setTopTenBooks] = useState<Record<string, BookRow[]>>({});
+  const [libraryBooks, setLibraryBooks] = useState<BookRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -136,6 +137,10 @@ export default function TopTensPage() {
   const [bookToDelete, setBookToDelete] = useState<BookRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Duplicate detection dialog state
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateLibraryBook, setDuplicateLibraryBook] = useState<BookRow | null>(null);
+
   useEffect(() => {
     const init: Record<string, boolean> = {};
     for (const m of members) init[m.email] = true;
@@ -143,33 +148,49 @@ export default function TopTensPage() {
   }, [members]);
 
   useEffect(() => {
-    async function fetchTopTenBooks() {
-      const { data, error } = await supabase
-        .from("books")
-        .select("*")
-        .eq("top_ten", true)
-        .in("member_email", members.map((m) => m.email))
-        .order("created_at", { ascending: false });
+    async function fetchBooks() {
+      // Fetch top ten and library books in parallel
+      const [topTenResult, libraryResult] = await Promise.all([
+        supabase
+          .from("books")
+          .select("*")
+          .eq("top_ten", true)
+          .in("member_email", members.map((m) => m.email))
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("books")
+          .select("*")
+          .eq("in_library", true)
+          .in("member_email", members.map((m) => m.email))
+      ]);
 
-      if (error) {
-        console.error("Error fetching top ten books:", error);
+      if (topTenResult.error) {
+        console.error("Error fetching top ten books:", topTenResult.error);
         setLoading(false);
         return;
       }
 
-      // Group books by member email and take only the first 10 for each
+      // Group top ten books by member email and take only the first 10 for each
       const grouped: Record<string, BookRow[]> = {};
       members.forEach((member) => {
-        grouped[member.email] = data
+        grouped[member.email] = topTenResult.data
           ?.filter((book) => book.member_email === member.email)
           .slice(0, 10) || [];
       });
 
       setTopTenBooks(grouped);
+      
+      // Store library books (normalized)
+      const normalizedLibrary = ((libraryResult.data ?? []) as BookRow[]).map((r) => ({
+        ...r,
+        member_email: normEmail(r.member_email),
+      }));
+      setLibraryBooks(normalizedLibrary);
+      
       setLoading(false);
     }
 
-    fetchTopTenBooks();
+    fetchBooks();
   }, [members]);
 
   useEffect(() => {
@@ -286,6 +307,38 @@ export default function TopTensPage() {
       return;
     }
 
+    // Check if book already exists in user's top ten
+    const alreadyInTopTen = userBooks.find(
+      (b) =>
+        b.title.toLowerCase() === title.toLowerCase() &&
+        (b.author || "").toLowerCase() === author.toLowerCase()
+    );
+    if (alreadyInTopTen) {
+      alert("This book is already in your Top Ten.");
+      return;
+    }
+
+    // Check if book already exists in library
+    const existingLibraryBook = libraryBooks.find(
+      (b) =>
+        b.member_email === authedEmail &&
+        b.title.toLowerCase() === title.toLowerCase() &&
+        (b.author || "").toLowerCase() === author.toLowerCase()
+    );
+
+    if (existingLibraryBook) {
+      // Book exists in library - show dialog
+      setDuplicateLibraryBook(existingLibraryBook);
+      setDuplicateDialogOpen(true);
+      return;
+    }
+
+    // Book doesn't exist - add new
+    await addNewTopTenBook(title, author, comment);
+  };
+
+  // Add a new top ten book (and to library)
+  const addNewTopTenBook = async (title: string, author: string, comment: string) => {
     setSaving(true);
 
     try {
@@ -299,42 +352,121 @@ export default function TopTensPage() {
         top_ten: true,
         in_library: true,
         rating: formRating,
-        // Don't set completed_at for top ten books - they're not reading completions
       });
 
       if (error) throw new Error(error.message);
 
-      // Reset form
-      setFormTitle("");
-      setFormAuthor("");
-      setFormComment("");
-      setFormCoverUrl(null);
-      setFormRating(null);
-      setSearchQuery("");
-      setSearchResults([]);
-      setShowResults(false);
-      setDialogOpen(false);
-
-      // Refresh the data
-      const { data } = await supabase
-        .from("books")
-        .select("*")
-        .eq("top_ten", true)
-        .in("member_email", members.map((m) => m.email))
-        .order("created_at", { ascending: false });
-
-      const grouped: Record<string, BookRow[]> = {};
-      members.forEach((member) => {
-        grouped[member.email] = data
-          ?.filter((book) => book.member_email === member.email)
-          .slice(0, 10) || [];
-      });
-
-      setTopTenBooks(grouped);
+      await refreshTopTenBooks();
+      handleDialogClose();
     } catch (e) {
       alert(`Error saving book: ${e instanceof Error ? e.message : "Unknown error"}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Replace library book with new top ten entry
+  const handleDuplicateReplace = async () => {
+    if (!duplicateLibraryBook || !authedEmail) return;
+
+    setSaving(true);
+
+    try {
+      // Delete the old library book
+      await supabase.from("books").delete().eq("id", duplicateLibraryBook.id);
+
+      // Add new top ten book
+      const { error } = await supabase.from("books").insert({
+        member_email: authedEmail,
+        status: "completed",
+        title: formTitle.trim(),
+        author: formAuthor.trim() || "",
+        comment: formComment.trim() || "",
+        cover_url: formCoverUrl || null,
+        top_ten: true,
+        in_library: true,
+        rating: formRating,
+      });
+
+      if (error) throw new Error(error.message);
+
+      await refreshTopTenBooks();
+      setDuplicateDialogOpen(false);
+      setDuplicateLibraryBook(null);
+      handleDialogClose();
+    } catch (e) {
+      alert(`Error saving book: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add from library (update existing record to be top ten)
+  const handleDuplicateAddFromLibrary = async () => {
+    if (!duplicateLibraryBook) return;
+
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("books")
+        .update({
+          top_ten: true,
+          rating: formRating || duplicateLibraryBook.rating,
+        })
+        .eq("id", duplicateLibraryBook.id);
+
+      if (error) throw new Error(error.message);
+
+      await refreshTopTenBooks();
+      setDuplicateDialogOpen(false);
+      setDuplicateLibraryBook(null);
+      handleDialogClose();
+    } catch (e) {
+      alert(`Error saving book: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Cancel duplicate dialog
+  const handleDuplicateCancel = () => {
+    setDuplicateDialogOpen(false);
+    setDuplicateLibraryBook(null);
+  };
+
+  // Refresh top ten books after changes
+  const refreshTopTenBooks = async () => {
+    const [topTenResult, libraryResult] = await Promise.all([
+      supabase
+        .from("books")
+        .select("*")
+        .eq("top_ten", true)
+        .in("member_email", members.map((m) => m.email))
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("books")
+        .select("*")
+        .eq("in_library", true)
+        .in("member_email", members.map((m) => m.email))
+    ]);
+
+    if (!topTenResult.error) {
+      const grouped: Record<string, BookRow[]> = {};
+      members.forEach((member) => {
+        grouped[member.email] = topTenResult.data
+          ?.filter((book) => book.member_email === member.email)
+          .slice(0, 10) || [];
+      });
+      setTopTenBooks(grouped);
+    }
+
+    if (!libraryResult.error) {
+      const normalizedLibrary = ((libraryResult.data ?? []) as BookRow[]).map((r) => ({
+        ...r,
+        member_email: normEmail(r.member_email),
+      }));
+      setLibraryBooks(normalizedLibrary);
     }
   };
 
@@ -352,27 +484,12 @@ export default function TopTensPage() {
     try {
       const { error } = await supabase
         .from("books")
-        .delete()
+        .update({ top_ten: false })
         .eq("id", bookToDelete.id);
 
       if (error) throw new Error(error.message);
 
-      // Refresh the data
-      const { data } = await supabase
-        .from("books")
-        .select("*")
-        .eq("top_ten", true)
-        .in("member_email", members.map((m) => m.email))
-        .order("created_at", { ascending: false });
-
-      const grouped: Record<string, BookRow[]> = {};
-      members.forEach((member) => {
-        grouped[member.email] = data
-          ?.filter((book) => book.member_email === member.email)
-          .slice(0, 10) || [];
-      });
-
-      setTopTenBooks(grouped);
+      await refreshTopTenBooks();
       setDeleteDialogOpen(false);
       setBookToDelete(null);
     } catch (e) {
@@ -703,12 +820,40 @@ export default function TopTensPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Duplicate Book Dialog */}
+      <Dialog open={duplicateDialogOpen} onClose={handleDuplicateCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Book Already in Library</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            <strong>{formTitle}</strong> already exists in your library. What would you like to do?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            • <strong>Replace</strong>: Replace the library entry with this new Top Ten entry
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            • <strong>Add from Library</strong>: Add the existing library book to your Top Ten
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDuplicateCancel} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleDuplicateAddFromLibrary} variant="outlined" disabled={saving}>
+            Add from Library
+          </Button>
+          <Button onClick={handleDuplicateReplace} variant="contained" disabled={saving}>
+            Replace
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="xs" fullWidth>
-        <DialogTitle>Remove Book?</DialogTitle>
+        <DialogTitle>Remove from Top Ten?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to remove <strong>{bookToDelete?.title}</strong> from your top ten list?
+            Are you sure you want to remove <strong>{bookToDelete?.title}</strong> from your Top Ten list?
+            The book will remain in your library.
           </Typography>
         </DialogContent>
         <DialogActions>
