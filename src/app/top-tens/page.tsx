@@ -316,7 +316,7 @@ export default function TopTensPage() {
     <>
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          Our Top Tens
+          Top Tens
         </Typography>
         <Typography variant="h6" component="p" sx={{ mb: 2 }}>
           The books that made our lists

@@ -17,8 +17,8 @@ import AuthFooterAction from "@/components/AuthFooterAction";
 
 const navItems = [
   { label: "Reading Challenge", href: "/reading-challenge" },
-  { label: "Our Top Tens", href: "/top-tens" },
-  { label: "Our Libraries", href: "/libraries" },
+  { label: "Top Tens", href: "/top-tens" },
+  { label: "Libraries", href: "/libraries" },
   { label: "Book Reports", href: "/book-report" },
   { label: "Donate", href: "/donate" },
 ];
