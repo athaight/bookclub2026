@@ -154,7 +154,7 @@ export default function AdminPage() {
 
       const allowed = members.some((m) => m.email === email);
       if (!allowed) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         setCheckingSession(false);
         window.location.href = "/admin/login";
         return;

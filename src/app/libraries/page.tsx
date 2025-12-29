@@ -134,7 +134,7 @@ export default function OurLibrariesPage() {
       if (email) {
         const allowed = members.some((m) => m.email === email);
         if (!allowed) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           setAuthedEmail(null);
         } else {
           setAuthedEmail(email);
@@ -151,7 +151,7 @@ export default function OurLibrariesPage() {
       if (email) {
         const allowed = members.some((m) => m.email === email);
         if (!allowed) {
-          supabase.auth.signOut();
+          supabase.auth.signOut({ scope: 'local' });
           setAuthedEmail(null);
         } else {
           setAuthedEmail(email);
@@ -434,8 +434,10 @@ export default function OurLibrariesPage() {
           Our Libraries
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
-          A collection of all the books we&apos;ve ever read. Books are automatically added when you
-          complete a book or add one to your Top Ten.
+          A collection of all the books we&apos;ve ever read.
+          {authedEmail && (
+            <> Books are automatically added when you complete a book or add one to your Top Ten.</>
+          )}
         </Typography>
       </Box>
 

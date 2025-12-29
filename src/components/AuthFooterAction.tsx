@@ -55,7 +55,7 @@ export default function AuthFooterAction({ loginHref = "/admin/login" }: Props) 
       size="small"
       variant="text"
       onClick={async () => {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         // optional: if they're on /admin, bounce them to home after logout
         if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
           window.location.href = "/";

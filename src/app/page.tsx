@@ -170,7 +170,7 @@ export default function HomePage() {
       if (email) {
         const allowed = members.some((m) => m.email === email);
         if (!allowed) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           setAuthedEmail(null);
         } else {
           setAuthedEmail(email);
@@ -187,7 +187,7 @@ export default function HomePage() {
       if (email) {
         const allowed = members.some((m) => m.email === email);
         if (!allowed) {
-          supabase.auth.signOut();
+          supabase.auth.signOut({ scope: 'local' });
           setAuthedEmail(null);
         } else {
           setAuthedEmail(email);
@@ -219,6 +219,7 @@ export default function HomePage() {
         members.map((m) => m.email)
       )
       .neq("top_ten", true)
+      .neq("in_library", true)
       .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear})`);
 
     if (error) {
@@ -381,7 +382,6 @@ export default function HomePage() {
           .update({
             status: "completed",
             completed_at: new Date().toISOString(),
-            in_library: true,
           })
           .eq("id", current.id);
 
