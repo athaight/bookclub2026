@@ -180,13 +180,20 @@ export default function AdminPage() {
   async function refresh() {
     setErr(null);
 
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1).toISOString();
+    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59).toISOString();
+
     const { data, error } = await supabase
       .from("books")
       .select("*")
       .in(
         "member_email",
         members.map((m) => m.email)
-      );
+      )
+      .not("top_ten", "is", true)
+      .not("in_library", "is", true)
+      .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear})`);
 
     if (error) {
       setErr(error.message);
