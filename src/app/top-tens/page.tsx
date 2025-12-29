@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -27,7 +27,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
@@ -46,16 +46,56 @@ function TopTenBookCard({
   index,
   isOwner,
   onDelete,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onDrop,
+  isDragging,
+  isDragOver,
 }: {
   row: BookRow;
   index: number;
   isOwner?: boolean;
   onDelete?: (row: BookRow) => void;
+  onDragStart?: () => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
+  onDrop?: () => void;
+  isDragging?: boolean;
+  isDragOver?: boolean;
 }) {
   return (
-    <Card sx={{ mb: 1 }}>
+    <Card
+      sx={{
+        mb: 1,
+        opacity: isDragging ? 0.5 : 1,
+        border: isDragOver ? "2px dashed #667eea" : "none",
+        transition: "all 0.2s ease",
+      }}
+      draggable={isOwner}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onDrop={onDrop}
+    >
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
         <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+          {/* Drag Handle - only show for owner */}
+          {isOwner && (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                cursor: "grab",
+                color: "text.secondary",
+                "&:active": { cursor: "grabbing" },
+                mt: 1,
+              }}
+            >
+              <DragIndicatorIcon fontSize="small" />
+            </Box>
+          )}
+
           {row.cover_url && (
             <Avatar
               src={row.cover_url}
@@ -141,6 +181,10 @@ export default function TopTensPage() {
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [duplicateLibraryBook, setDuplicateLibraryBook] = useState<BookRow | null>(null);
 
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   useEffect(() => {
     const init: Record<string, boolean> = {};
     for (const m of members) init[m.email] = true;
@@ -156,7 +200,7 @@ export default function TopTensPage() {
           .select("*")
           .eq("top_ten", true)
           .in("member_email", members.map((m) => m.email))
-          .order("created_at", { ascending: false }),
+          .order("top_ten_rank", { ascending: true, nullsFirst: false }),
         supabase
           .from("books")
           .select("*")
@@ -341,6 +385,10 @@ export default function TopTensPage() {
   const addNewTopTenBook = async (title: string, author: string, comment: string) => {
     setSaving(true);
 
+    // Calculate next rank (add to end of list)
+    const userBooks = topTenBooks[authedEmail || ""] || [];
+    const nextRank = userBooks.length + 1;
+
     try {
       const { error } = await supabase.from("books").insert({
         member_email: authedEmail,
@@ -352,6 +400,7 @@ export default function TopTensPage() {
         top_ten: true,
         in_library: true,
         rating: formRating,
+        top_ten_rank: nextRank,
       });
 
       if (error) throw new Error(error.message);
@@ -375,6 +424,10 @@ export default function TopTensPage() {
       // Delete the old library book
       await supabase.from("books").delete().eq("id", duplicateLibraryBook.id);
 
+      // Calculate next rank (add to end of list)
+      const userBooks = topTenBooks[authedEmail || ""] || [];
+      const nextRank = userBooks.length + 1;
+
       // Add new top ten book
       const { error } = await supabase.from("books").insert({
         member_email: authedEmail,
@@ -386,6 +439,7 @@ export default function TopTensPage() {
         top_ten: true,
         in_library: true,
         rating: formRating,
+        top_ten_rank: nextRank,
       });
 
       if (error) throw new Error(error.message);
@@ -407,12 +461,17 @@ export default function TopTensPage() {
 
     setSaving(true);
 
+    // Calculate next rank (add to end of list)
+    const userBooks = topTenBooks[authedEmail || ""] || [];
+    const nextRank = userBooks.length + 1;
+
     try {
       const { error } = await supabase
         .from("books")
         .update({
           top_ten: true,
           rating: formRating || duplicateLibraryBook.rating,
+          top_ten_rank: nextRank,
         })
         .eq("id", duplicateLibraryBook.id);
 
@@ -443,7 +502,7 @@ export default function TopTensPage() {
         .select("*")
         .eq("top_ten", true)
         .in("member_email", members.map((m) => m.email))
-        .order("created_at", { ascending: false }),
+        .order("top_ten_rank", { ascending: true, nullsFirst: false }),
       supabase
         .from("books")
         .select("*")
@@ -454,9 +513,20 @@ export default function TopTensPage() {
     if (!topTenResult.error) {
       const grouped: Record<string, BookRow[]> = {};
       members.forEach((member) => {
-        grouped[member.email] = topTenResult.data
-          ?.filter((book) => book.member_email === member.email)
-          .slice(0, 10) || [];
+        // Sort by top_ten_rank, with nulls at the end (sorted by created_at)
+        const memberBooks = topTenResult.data
+          ?.filter((book) => book.member_email === member.email) || [];
+        
+        memberBooks.sort((a, b) => {
+          if (a.top_ten_rank == null && b.top_ten_rank == null) {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          }
+          if (a.top_ten_rank == null) return 1;
+          if (b.top_ten_rank == null) return -1;
+          return a.top_ten_rank - b.top_ten_rank;
+        });
+        
+        grouped[member.email] = memberBooks.slice(0, 10);
       });
       setTopTenBooks(grouped);
     }
@@ -467,6 +537,61 @@ export default function TopTensPage() {
         member_email: normEmail(r.member_email),
       }));
       setLibraryBooks(normalizedLibrary);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (targetIndex: number, memberEmail: string) => {
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const userBooks = [...(topTenBooks[memberEmail] || [])];
+    const [draggedBook] = userBooks.splice(draggedIndex, 1);
+    userBooks.splice(targetIndex, 0, draggedBook);
+
+    // Optimistically update UI
+    setTopTenBooks((prev) => ({
+      ...prev,
+      [memberEmail]: userBooks,
+    }));
+
+    handleDragEnd();
+
+    // Update ranks in database
+    try {
+      const updates = userBooks.map((book, index) => ({
+        id: book.id,
+        top_ten_rank: index + 1,
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from("books")
+          .update({ top_ten_rank: update.top_ten_rank })
+          .eq("id", update.id);
+      }
+    } catch (e) {
+      console.error("Error updating ranks:", e);
+      // Refresh to restore correct order on error
+      await refreshTopTenBooks();
     }
   };
 
@@ -566,6 +691,12 @@ export default function TopTensPage() {
               index={index}
               isOwner={isOwner}
               onDelete={handleDeleteClick}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              onDrop={() => handleDrop(index, m.email)}
+              isDragging={draggedIndex === index}
+              isDragOver={dragOverIndex === index}
             />
           ))
         ) : (
@@ -604,6 +735,12 @@ export default function TopTensPage() {
               index={index}
               isOwner={isOwner}
               onDelete={handleDeleteClick}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              onDrop={() => handleDrop(index, m.email)}
+              isDragging={draggedIndex === index}
+              isDragOver={dragOverIndex === index}
             />
           ))
         ) : (
