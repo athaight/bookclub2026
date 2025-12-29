@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import Link from "next/link";
 import {
   Accordion,
   AccordionDetails,
@@ -79,12 +80,27 @@ function TopTenBookCard({
       onDrop={onDrop}
     >
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+        {/* Drag Handle - top center on mobile, only show for owner */}
+        {isOwner && (
+          <Box
+            sx={{
+              display: { xs: "flex", sm: "none" },
+              justifyContent: "center",
+              cursor: "grab",
+              color: "text.secondary",
+              "&:active": { cursor: "grabbing" },
+              mb: 0.5,
+            }}
+          >
+            <DragIndicatorIcon fontSize="small" sx={{ transform: "rotate(90deg)" }} />
+          </Box>
+        )}
         <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-          {/* Drag Handle - only show for owner */}
+          {/* Drag Handle - left side on desktop, only show for owner */}
           {isOwner && (
             <Box
               sx={{
-                display: "flex",
+                display: { xs: "none", sm: "flex" },
                 alignItems: "center",
                 cursor: "grab",
                 color: "text.secondary",
@@ -662,8 +678,18 @@ export default function TopTensPage() {
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+            <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" linkToProfile />
+            <Typography
+              component={Link}
+              href="/profiles"
+              variant="h5"
+              sx={{
+                fontWeight: 600,
+                textDecoration: "none",
+                color: "inherit",
+                "&:hover": { color: "primary.main" },
+              }}
+            >
               {m.name}&apos;s Top 10
             </Typography>
           </Box>
@@ -790,9 +816,19 @@ export default function TopTensPage() {
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
-                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
+                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" linkToProfile />
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" component="h2">
+                      <Typography
+                        component={Link}
+                        href="/profiles"
+                        variant="h6"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        sx={{
+                          textDecoration: "none",
+                          color: "inherit",
+                          "&:hover": { color: "primary.main" },
+                        }}
+                      >
                         {m.name}&apos;s Top 10
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.75 }}>

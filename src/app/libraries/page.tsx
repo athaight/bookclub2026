@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Accordion,
   AccordionDetails,
@@ -487,8 +488,18 @@ export default function OurLibrariesPage() {
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+            <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" linkToProfile />
+            <Typography
+              component={Link}
+              href="/profiles"
+              variant="h5"
+              sx={{
+                fontWeight: 600,
+                textDecoration: "none",
+                color: "inherit",
+                "&:hover": { color: "primary.main" },
+              }}
+            >
               {m.name}&apos;s Library
             </Typography>
           </Box>
@@ -608,9 +619,19 @@ export default function OurLibrariesPage() {
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
-                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
+                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" linkToProfile />
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" component="h2">
+                      <Typography
+                        component={Link}
+                        href="/profiles"
+                        variant="h6"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        sx={{
+                          textDecoration: "none",
+                          color: "inherit",
+                          "&:hover": { color: "primary.main" },
+                        }}
+                      >
                         {m.name}&apos;s Library
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.75 }}>

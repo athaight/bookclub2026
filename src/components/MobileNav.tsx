@@ -20,6 +20,7 @@ const navItems = [
   { label: "Top Tens", href: "/top-tens" },
   { label: "Libraries", href: "/libraries" },
   { label: "Book Reports", href: "/book-report" },
+  { label: "Profiles", href: "/profiles" },
   { label: "Donate", href: "/donate" },
 ];
 

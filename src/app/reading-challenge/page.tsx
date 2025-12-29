@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Accordion,
   AccordionDetails,
@@ -785,12 +786,22 @@ export default function HomePage() {
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
-                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" />
+                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="medium" linkToProfile />
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" component="h2" sx={{ fontWeight: 800 }}>
                         {rankLabel(rankIndex)}
                       </Typography>
-                      <Typography variant="subtitle1" component="h2">
+                      <Typography
+                        component={Link}
+                        href="/profiles"
+                        variant="subtitle1"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        sx={{
+                          textDecoration: "none",
+                          color: "inherit",
+                          "&:hover": { color: "primary.main" },
+                        }}
+                      >
                         {m.name}
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.75 }}>
@@ -832,12 +843,28 @@ export default function HomePage() {
                 const rankIndex = scored.findIndex((s) => s.email === m.email);
                 return (
                   <Box key={m.email} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="large" />
+                    <Box
+                      component={Link}
+                      href="/profiles"
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        textDecoration: "none",
+                        color: "inherit",
+                        "&:hover": { color: "primary.main" },
+                      }}
+                    >
+                      <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="large" />
+                      <Typography
+                        variant="body1"
+                        sx={{ color: "text.secondary" }}
+                      >
+                        {m.name}
+                      </Typography>
+                    </Box>
                     <Typography variant="h5" component="h2" sx={{ fontWeight: 800 }}>
                       {rankLabel(rankIndex)}
-                    </Typography>
-                    <Typography variant="body1" component="span" sx={{ color: "text.secondary" }}>
-                      {m.name}
                     </Typography>
                   </Box>
                 );

@@ -1,4 +1,5 @@
-import { Avatar, AvatarProps } from "@mui/material";
+import Link from "next/link";
+import { Avatar, AvatarProps, Box } from "@mui/material";
 import { ProfileRow } from "@/types";
 
 interface MemberAvatarProps extends Omit<AvatarProps, 'src' | 'children'> {
@@ -6,6 +7,7 @@ interface MemberAvatarProps extends Omit<AvatarProps, 'src' | 'children'> {
   email: string;
   profiles: Record<string, ProfileRow>;
   size?: "small" | "medium" | "large";
+  linkToProfile?: boolean;
 }
 
 const sizeMap = {
@@ -27,6 +29,7 @@ export default function MemberAvatar({
   email,
   profiles,
   size = "small",
+  linkToProfile = false,
   sx,
   ...props
 }: MemberAvatarProps) {
@@ -34,13 +37,21 @@ export default function MemberAvatar({
   const avatarUrl = profile?.avatar_url;
   const dimension = sizeMap[size];
 
-  return (
+  const avatar = (
     <Avatar
       src={avatarUrl || undefined}
       sx={{
         width: dimension,
         height: dimension,
         fontSize: dimension * 0.45,
+        ...(linkToProfile && {
+          cursor: "pointer",
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+          "&:hover": {
+            transform: "scale(1.1)",
+            boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+          },
+        }),
         ...sx,
       }}
       {...props}
@@ -48,4 +59,14 @@ export default function MemberAvatar({
       {!avatarUrl && getInitials(name)}
     </Avatar>
   );
+
+  if (linkToProfile) {
+    return (
+      <Link href="/profiles" style={{ textDecoration: "none" }}>
+        {avatar}
+      </Link>
+    );
+  }
+
+  return avatar;
 }

@@ -35,6 +35,9 @@ export default function SiteHeader() {
           <Button component={Link} href="/book-report">
             Book Reports
           </Button>
+          <Button component={Link} href="/profiles">
+            Profiles
+          </Button>
           <Button component={Link} href="/donate">
             Donate
           </Button>
