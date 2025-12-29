@@ -825,14 +825,12 @@ export default function HomePage() {
                 return (
                   <Box key={m.email} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                     <MemberAvatar name={m.name} email={m.email} profiles={profiles} size="large" />
-                    <Box>
-                      <Typography variant="h5" component="h2" sx={{ fontWeight: 800, mb: 0.5 }}>
-                        {rankLabel(rankIndex)}
-                      </Typography>
-                      <Typography variant="body1" component="h2" sx={{ color: "text.secondary" }}>
-                        {m.name}
-                      </Typography>
-                    </Box>
+                    <Typography variant="h5" component="h2" sx={{ fontWeight: 800 }}>
+                      {rankLabel(rankIndex)}
+                    </Typography>
+                    <Typography variant="body1" component="span" sx={{ color: "text.secondary" }}>
+                      {m.name}
+                    </Typography>
                   </Box>
                 );
               })}
