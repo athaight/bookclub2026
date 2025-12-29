@@ -226,7 +226,6 @@ export default function HomePage() {
         members.map((m) => m.email)
       )
       .not("top_ten", "is", true)
-      .not("in_library", "is", true)
       .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear})`);
 
     if (error) {
