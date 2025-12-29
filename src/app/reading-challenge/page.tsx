@@ -276,6 +276,7 @@ export default function HomePage() {
     .sort((a, b) => b.completedCount - a.completedCount);
 
   console.log("[DEBUG] Rows fetched:", rows.length);
+  console.log("[DEBUG] Raw rows:", rows.map(r => ({ title: r.title, status: r.status, completed_at: r.completed_at, top_ten: r.top_ten, member: r.member_email })));
   console.log("[DEBUG] byEmail:", JSON.stringify(Object.fromEntries(
     Object.entries(byEmail).map(([k, v]) => [k, { current: v.current?.title, completedCount: v.completed.length }])
   )));
