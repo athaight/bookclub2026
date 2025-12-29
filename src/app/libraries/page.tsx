@@ -572,7 +572,6 @@ export default function OurLibrariesPage() {
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
           A collection of all the books we&apos;ve ever read.
-          {authedEmail && }
         </Typography>
       </Box>
 
