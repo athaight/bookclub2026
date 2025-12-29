@@ -218,8 +218,8 @@ export default function HomePage() {
         "member_email",
         members.map((m) => m.email)
       )
-      .neq("top_ten", true)
-      .neq("in_library", true)
+      .or("top_ten.is.null,top_ten.eq.false")
+      .or("in_library.is.null,in_library.eq.false")
       .or(`status.eq.current,and(status.eq.completed,completed_at.gte.${startOfYear},completed_at.lte.${endOfYear})`);
 
     if (error) {
