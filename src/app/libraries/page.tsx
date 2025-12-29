@@ -414,6 +414,13 @@ export default function OurLibrariesPage() {
             justifyContent: "space-between",
             alignItems: "center",
             mb: 2,
+            position: "sticky",
+            top: 64,
+            zIndex: 10,
+            backgroundColor: "background.default",
+            py: 1,
+            mx: -1,
+            px: 1,
           }}
         >
           <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
@@ -495,7 +502,7 @@ export default function OurLibrariesPage() {
     <>
       <Box sx={{ textAlign: "center", mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          Our Libraries
+          Libraries
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
           A collection of all the books we&apos;ve ever read.
