@@ -148,22 +148,23 @@ export default function ProfilePage() {
     const file = event.target.files[0];
     const fileExt = file.name.split(".").pop();
     const fileName = `${authedEmail.replace(/[^a-z0-9]/g, "_")}_${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
 
     setUploading(true);
     setError(null);
 
     try {
       // Upload file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from("avatars")
-        .upload(filePath, file, { upsert: true });
+        .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw new Error(uploadError.message);
 
       // Get public URL
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
       const newAvatarUrl = urlData.publicUrl;
+
+      console.log("[DEBUG] Avatar upload:", { fileName, uploadData, newAvatarUrl });
 
       setAvatarUrl(newAvatarUrl);
 
