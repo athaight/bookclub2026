@@ -371,68 +371,75 @@ export default function ProfilesPage() {
                     Genre Distribution
                   </Typography>
                   
-                  {/* Pie Chart - centered, no legend */}
-                  <Box sx={{ width: "100%", height: 200, display: "flex", justifyContent: "center" }}>
-                    <PieChart
-                      series={[
-                        {
-                          data: stats.genres.map(([genre, count], index) => ({
-                            id: index,
-                            value: count,
-                          })),
-                          innerRadius: 25,
-                          outerRadius: 80,
-                          paddingAngle: 2,
-                          cornerRadius: 5,
-                        },
-                      ]}
-                      width={200}
-                      height={200}
-                    />
-                  </Box>
-                  
-                  {/* Custom Legend - wraps naturally */}
-                  <Box 
-                    sx={{ 
-                      display: "flex", 
-                      flexWrap: "wrap", 
-                      gap: 1,
-                      justifyContent: "center",
-                      mt: "24px",
-                    }}
-                  >
-                    {stats.genres.map(([genre, count], index) => {
-                      const colors = [
-                        "#02b2af", "#2e96ff", "#b800d8", "#60009b", "#2731c8",
-                        "#03008d", "#ff6f00", "#4caf50", "#f44336", "#9c27b0"
-                      ];
-                      return (
+                  {/* Shared color palette for chart and legend */}
+                  {(() => {
+                    const genreColors = [
+                      "#02b2af", "#2e96ff", "#b800d8", "#60009b", "#2731c8",
+                      "#03008d", "#ff6f00", "#4caf50", "#f44336", "#9c27b0"
+                    ];
+                    
+                    return (
+                      <>
+                        {/* Pie Chart - centered, no legend */}
+                        <Box sx={{ width: "100%", height: 200, display: "flex", justifyContent: "center" }}>
+                          <PieChart
+                            series={[
+                              {
+                                data: stats.genres.map(([genre, count], index) => ({
+                                  id: index,
+                                  value: count,
+                                  color: genreColors[index % genreColors.length],
+                                })),
+                                innerRadius: 25,
+                                outerRadius: 80,
+                                paddingAngle: 2,
+                                cornerRadius: 5,
+                              },
+                            ]}
+                            width={200}
+                            height={200}
+                          />
+                        </Box>
+                        
+                        {/* Custom Legend - wraps naturally */}
                         <Box 
-                          key={genre} 
                           sx={{ 
                             display: "flex", 
-                            alignItems: "center", 
-                            gap: 0.5,
-                            px: 1,
-                            py: 0.5,
+                            flexWrap: "wrap", 
+                            gap: 1,
+                            justifyContent: "center",
+                            mt: "24px",
                           }}
                         >
-                          <Box 
-                            sx={{ 
-                              width: 12, 
-                              height: 12, 
-                              borderRadius: "50%", 
-                              backgroundColor: colors[index % colors.length],
-                              flexShrink: 0,
-                            }} 
-                          />
-                          <Typography variant="body2" sx={{ fontSize: 12 }}>
-                            {genre} ({count})
-                          </Typography>
+                          {stats.genres.map(([genre, count], index) => (
+                            <Box 
+                              key={genre} 
+                              sx={{ 
+                                display: "flex", 
+                                alignItems: "center", 
+                                gap: 0.5,
+                                px: 1,
+                                py: 0.5,
+                              }}
+                            >
+                              <Box 
+                                sx={{ 
+                                  width: 12, 
+                                  height: 12, 
+                                  borderRadius: "50%", 
+                                  backgroundColor: genreColors[index % genreColors.length],
+                                  flexShrink: 0,
+                                }} 
+                              />
+                              <Typography variant="body2" sx={{ fontSize: 12 }}>
+                                {genre} ({count})
+                              </Typography>
+                            </Box>
+                          ))}
                         </Box>
-                      );
-                    })}
-                  </Box>
+                      </>
+                    );
+                  })()}
                 </Box>
               )}
 
