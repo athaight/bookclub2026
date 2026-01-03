@@ -787,7 +787,7 @@ export default function HomePage() {
           2026
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: 'auto', color: 'text.secondary' }}>
-          Our 2026 challenge is to see who reads the most books this year. Here, you&apos;ll see what we&apos;re currently reading and what we&apos;ve finished to determine which one of us is a true Bibliophile (1st place), or could be considered a Bookworm (2nd place), or just Bookish (3rd place).
+          Our 2026 challenge is to see who reads the most books this year. Here, you&apos;ll see what we&apos;re currently reading (up to three books at a time) and what we&apos;ve finished to determine which one of us is a true Bibliophile (1st place), or could be considered a Bookworm (2nd place), or just Bookish (3rd place).
         </Typography>
       </Box>
 
@@ -843,22 +843,10 @@ export default function HomePage() {
                       >
                         {m.name}
                       </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                        <Box component="span" sx={{ fontWeight: 600 }}>Current:</Box> {currentBooks.length === 0 ? "—" : ""}
+                      <Typography variant="body2" sx={{ opacity: 0.75, mt: 1 }}>
+                        <Box component="span" sx={{ fontWeight: 600 }}>Current books:</Box> {currentBooks.length}
                       </Typography>
-                      {currentBooks.map((book, idx) => (
-                        <Box key={book.id} sx={{ pl: 1 }}>
-                          <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                            {book.title?.trim() || "—"}
-                          </Typography>
-                          {book.author?.trim() && (
-                            <Typography variant="body2" sx={{ opacity: 0.6, pl: 1 }}>
-                              by {book.author.trim()}
-                            </Typography>
-                          )}
-                        </Box>
-                      ))}
-                      <Typography variant="body2" sx={{ opacity: 0.75, mt: 2 }}>
+                      <Typography variant="body2" sx={{ opacity: 0.75, mt: 1 }}>
                         <Box component="span" sx={{ fontWeight: 600 }}>Books read:</Box> {bucket.completed.length}
                       </Typography>
                     </Box>

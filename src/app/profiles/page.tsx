@@ -75,7 +75,7 @@ export default function ProfilesPage() {
     
     // Reading Challenge stats (2026)
     const challengeBooks = books.filter((b) => b.reading_challenge_year === 2026);
-    const currentBook = challengeBooks.find((b) => b.status === "current");
+    const currentBooks = challengeBooks.filter((b) => b.status === "current");
     const completedChallengeBooks = challengeBooks.filter((b) => b.status === "completed");
     
     // Calculate monthly reading stats
@@ -118,7 +118,7 @@ export default function ProfilesPage() {
       .slice(0, 10); // Top 10 genres
 
     return {
-      currentBook,
+      currentBooks,
       booksRead: completedChallengeBooks.length,
       rankLabel,
       monthlyData,
@@ -252,29 +252,33 @@ export default function ProfilesPage() {
                 }}
               >
                 {/* Current Book */}
-                <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 2 }}>
-                  {stats.currentBook ? (
+                <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  {stats.currentBooks.length > 0 ? (
                     <>
-                      {stats.currentBook.cover_url && (
-                        <Avatar
-                          src={stats.currentBook.cover_url}
-                          variant="rounded"
-                          sx={{ width: 60, height: 90, flexShrink: 0 }}
-                        />
-                      )}
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">
-                          Currently Reading
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                          {stats.currentBook.title}
-                        </Typography>
-                        {stats.currentBook.author && (
-                          <Typography variant="body2" color="text.secondary">
-                            by {stats.currentBook.author}
-                          </Typography>
-                        )}
-                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Currently Reading ({stats.currentBooks.length})
+                      </Typography>
+                      {stats.currentBooks.map((book) => (
+                        <Box key={book.id} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          {book.cover_url && (
+                            <Avatar
+                              src={book.cover_url}
+                              variant="rounded"
+                              sx={{ width: 50, height: 75, flexShrink: 0 }}
+                            />
+                          )}
+                          <Box>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {book.title}
+                            </Typography>
+                            {book.author && (
+                              <Typography variant="body2" color="text.secondary">
+                                by {book.author}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      ))}
                     </>
                   ) : (
                     <Typography variant="body1" color="text.secondary">
