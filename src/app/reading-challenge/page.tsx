@@ -44,7 +44,9 @@ import MemberAvatar from "@/components/MemberAvatar";
 
 type Member = { email: string; name: string };
 
-type Bucket = { current?: BookRow; completed: BookRow[] };
+type Bucket = { current: BookRow[]; completed: BookRow[] };
+
+const MAX_CURRENT_BOOKS = 3;
 
 const normEmail = (s: string) => s.trim().toLowerCase();
 
@@ -144,6 +146,7 @@ export default function HomePage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [editingCurrent, setEditingCurrent] = useState(false);
+  const [editingBookId, setEditingBookId] = useState<string | null>(null); // null = adding new book
   const [draftTitle, setDraftTitle] = useState("");
   const [draftAuthor, setDraftAuthor] = useState("");
   const [draftComment, setDraftComment] = useState("");
@@ -163,7 +166,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const init: Record<string, boolean> = {};
-    for (const m of members) init[m.email] = true;
+    for (const m of members) init[m.email] = false;
     setExpanded(init);
   }, [members]);
 
@@ -254,12 +257,12 @@ export default function HomePage() {
 
   // Library books are excluded from the query, so all fetched books can be displayed
   const byEmail: Record<string, Bucket> = {};
-  for (const m of members) byEmail[m.email] = { completed: [] };
+  for (const m of members) byEmail[m.email] = { current: [], completed: [] };
 
   for (const r of rows) {
     const bucket = byEmail[r.member_email];
     if (!bucket) continue;
-    if (r.status === "current") bucket.current = r;
+    if (r.status === "current") bucket.current.push(r);
     else bucket.completed.push(r);
   }
 
@@ -291,6 +294,7 @@ export default function HomePage() {
     setMarkCompleted(false);
     setDraftRating(null);
     setEditingCurrent(false);
+    setEditingBookId(null);
     setSearchQuery("");
     setSearchResults([]);
     setShowResults(false);
@@ -304,6 +308,7 @@ export default function HomePage() {
     setMarkCompleted(false);
     setDraftRating(null);
     setEditingCurrent(true);
+    setEditingBookId(current.id);
     setSearchQuery("");
     setSearchResults([]);
     setShowResults(false);
@@ -359,12 +364,19 @@ export default function HomePage() {
     setSaving(true);
     setErr(null);
 
-    const current = byEmail[memberEmail]?.current;
+    const currentBooks = byEmail[memberEmail]?.current ?? [];
     // 2026 Reading Challenge
     const challengeYear = 2026;
 
     try {
-      if (!current) {
+      if (!editingBookId) {
+        // Adding a new book - check limit first
+        if (!markCompleted && currentBooks.length >= MAX_CURRENT_BOOKS) {
+          setErr(`You can only have up to ${MAX_CURRENT_BOOKS} current books.`);
+          setSaving(false);
+          return;
+        }
+        
         // Adding a new book - either as current or directly as completed
         // Mark with reading_challenge_year so it appears in this year's challenge
         // If marked as completed immediately, also add to library
@@ -387,6 +399,7 @@ export default function HomePage() {
         return;
       }
 
+      // Editing an existing book
       const { error: updateErr } = await supabase
         .from("books")
         .update({
@@ -395,7 +408,7 @@ export default function HomePage() {
           comment: comment || "",
           cover_url: draftCoverUrl || null,
         })
-        .eq("id", current.id);
+        .eq("id", editingBookId);
 
       if (updateErr) throw new Error(updateErr.message);
 
@@ -409,12 +422,13 @@ export default function HomePage() {
             rating: draftRating,
             in_library: true,
           })
-          .eq("id", current.id);
+          .eq("id", editingBookId);
 
         if (completeErr) throw new Error(completeErr.message);
         resetEditorToBlank();
       } else {
         setEditingCurrent(false);
+        setEditingBookId(null);
         setMarkCompleted(false);
       }
 
@@ -443,16 +457,19 @@ export default function HomePage() {
   }
 
   function renderCurrentBlock(memberEmail: string) {
-    const bucket = byEmail[memberEmail] ?? { completed: [] };
-    const current = bucket.current;
+    const bucket = byEmail[memberEmail] ?? { current: [], completed: [] };
+    const currentBooks = bucket.current;
     const isOwner = authedEmail === memberEmail;
+    const canAddMore = currentBooks.length < MAX_CURRENT_BOOKS;
 
     // If owner + editing: show editor
     if (isOwner && editingCurrent) {
       return (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <Typography variant="overline">Current book (edit)</Typography>
+            <Typography variant="overline">
+              {editingBookId ? "Edit current book" : "Add current book"}
+            </Typography>
 
             {/* Book Search Section */}
             <Box>
@@ -567,7 +584,7 @@ export default function HomePage() {
                   onChange={(e) => setMarkCompleted(e.target.checked)}
                 />
               }
-              label={current ? "Mark this current book as completed" : "Add as completed (already finished reading)"}
+              label={editingBookId ? "Mark this book as completed" : "Add as completed (already finished reading)"}
             />
 
             {markCompleted && (
@@ -597,39 +614,57 @@ export default function HomePage() {
       );
     }
 
-    // Otherwise: show current card (with caret expander) + Edit button for owner
-    if (current) {
+    // Show current books (up to 3)
+    if (currentBooks.length > 0) {
       return (
-        <Card sx={{ height: 120 }}>
-          <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-            <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flex: 1 }}>
-              {current.cover_url && (
-                <Avatar
-                  src={current.cover_url}
-                  variant="rounded"
-                  sx={{ width: 40, height: 60, flexShrink: 0 }}
-                />
-              )}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="h6" component="h3" noWrap>
-                  {(current.title ?? "").trim() || "—"}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8 }} noWrap>
-                  {(current.author ?? "").trim() || "—"}
-                </Typography>
-              </Box>
-              {isOwner && (
-                <IconButton
-                  aria-label="edit current"
-                  onClick={() => loadEditorFromCurrent(current)}
-                  size="small"
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              )}
-            </Box>
-          </CardContent>
-        </Card>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {currentBooks.map((current) => (
+            <Card key={current.id} sx={{ minHeight: 100 }}>
+              <CardContent sx={{ display: "flex", flexDirection: "column", py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flex: 1 }}>
+                  {current.cover_url && (
+                    <Avatar
+                      src={current.cover_url}
+                      variant="rounded"
+                      sx={{ width: 40, height: 60, flexShrink: 0 }}
+                    />
+                  )}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="subtitle1" component="h3" noWrap sx={{ fontWeight: 600 }}>
+                      {(current.title ?? "").trim() || "—"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8 }} noWrap>
+                      {(current.author ?? "").trim() || "—"}
+                    </Typography>
+                  </Box>
+                  {isOwner && (
+                    <IconButton
+                      aria-label="edit current"
+                      onClick={() => loadEditorFromCurrent(current)}
+                      size="small"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
+          {isOwner && canAddMore && (
+            <Button
+              startIcon={<EditIcon />}
+              onClick={() => {
+                resetEditorToBlank();
+                setEditingCurrent(true);
+              }}
+              variant="outlined"
+              size="small"
+              sx={{ alignSelf: "flex-start" }}
+            >
+              Add another book ({currentBooks.length}/{MAX_CURRENT_BOOKS})
+            </Button>
+          )}
+        </Box>
       );
     }
 
@@ -669,7 +704,7 @@ export default function HomePage() {
   }
 
   function renderDesktopColumn(m: Member, rankIndex: number) {
-    const bucket = byEmail[m.email] ?? { completed: [] };
+    const bucket = byEmail[m.email] ?? { current: [], completed: [] };
 
     return (
       <Box>
@@ -715,7 +750,7 @@ export default function HomePage() {
   }
 
   function renderMobileDetails(m: Member) {
-    const bucket = byEmail[m.email] ?? { completed: [] };
+    const bucket = byEmail[m.email] ?? { current: [], completed: [] };
 
     return (
       <>
@@ -765,8 +800,8 @@ export default function HomePage() {
       {isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {orderedForMobile.map((m, rankIndex) => {
-            const bucket = byEmail[m.email] ?? { completed: [] };
-            const currentTitle = bucket.current?.title?.trim() || "—";
+            const bucket = byEmail[m.email] ?? { current: [], completed: [] };
+            const currentBooks = bucket.current;
             const isExpanded = !!expanded[m.email];
 
             return (
@@ -809,7 +844,22 @@ export default function HomePage() {
                         {m.name}
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                        Current: {currentTitle}
+                        <Box component="span" sx={{ fontWeight: 600 }}>Current:</Box> {currentBooks.length === 0 ? "—" : ""}
+                      </Typography>
+                      {currentBooks.map((book, idx) => (
+                        <Box key={book.id} sx={{ pl: 1 }}>
+                          <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                            {book.title?.trim() || "—"}
+                          </Typography>
+                          {book.author?.trim() && (
+                            <Typography variant="body2" sx={{ opacity: 0.6, pl: 1 }}>
+                              by {book.author.trim()}
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
+                      <Typography variant="body2" sx={{ opacity: 0.75, mt: 2 }}>
+                        <Box component="span" sx={{ fontWeight: 600 }}>Books read:</Box> {bucket.completed.length}
                       </Typography>
                     </Box>
                   </Box>
