@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import {
   Accordion,
@@ -157,10 +157,13 @@ export default function HomePage() {
   const [saving, setSaving] = useState(false);
 
   // Book search state
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchResults, setSearchResults] = useState<BookSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastQuery, setLastQuery] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<BookRow | null>(null);
 
@@ -295,7 +298,7 @@ export default function HomePage() {
     setDraftRating(null);
     setEditingCurrent(false);
     setEditingBookId(null);
-    setSearchQuery("");
+    if (searchInputRef.current) searchInputRef.current.value = "";
     setSearchResults([]);
     setShowResults(false);
   }
@@ -309,14 +312,14 @@ export default function HomePage() {
     setDraftRating(null);
     setEditingCurrent(true);
     setEditingBookId(current.id);
-    setSearchQuery("");
+    if (searchInputRef.current) searchInputRef.current.value = "";
     setSearchResults([]);
     setShowResults(false);
   }
 
   // Book search handlers
   async function handleSearch() {
-    const query = searchQuery.trim();
+    const query = searchInputRef.current?.value.trim() || "";
     if (query.length < 3) {
       setSearchResults([]);
       setShowResults(false);
@@ -325,15 +328,37 @@ export default function HomePage() {
 
     setSearchLoading(true);
     setShowResults(true);
+    setLastQuery(query);
 
     try {
-      const results = await searchBooks(query);
-      setSearchResults(results);
+      const { books, hasMore } = await searchBooks(query, { limit: 30 });
+      setSearchResults(books);
+      setHasMoreResults(hasMore);
     } catch (error) {
       console.error("Search error:", error);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
+    }
+  }
+
+  async function handleLoadMore() {
+    if (lastQuery.length < 3) return;
+    setLoadingMore(true);
+    try {
+      const { books: moreResults, hasMore } = await searchBooks(lastQuery, { limit: 30, offset: searchResults.length });
+      if (moreResults.length > 0) {
+        const existingKeys = new Set(searchResults.map(b => `${b.title.toLowerCase()}|${(b.author || '').toLowerCase()}`));
+        const newResults = moreResults.filter(b => !existingKeys.has(`${b.title.toLowerCase()}|${(b.author || '').toLowerCase()}`));
+        setSearchResults([...searchResults, ...newResults]);
+        setHasMoreResults(hasMore);
+      } else {
+        setHasMoreResults(false);
+      }
+    } catch (error) {
+      console.error("Load more error:", error);
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -344,7 +369,7 @@ export default function HomePage() {
     setDraftGenre(book.genre || null);
     setSearchResults([]);
     setShowResults(false);
-    setSearchQuery("");
+    if (searchInputRef.current) searchInputRef.current.value = "";
   }
 
   async function saveCurrent(memberEmail: string) {
@@ -482,8 +507,7 @@ export default function HomePage() {
                   fullWidth
                   variant="outlined"
                   size="small"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  inputRef={searchInputRef}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -494,7 +518,7 @@ export default function HomePage() {
                 <Button
                   variant="contained"
                   onClick={handleSearch}
-                  disabled={searchLoading || searchQuery.trim().length < 3}
+                  disabled={searchLoading}
                   sx={{ minWidth: 'auto', px: 2 }}
                 >
                   {searchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
@@ -503,34 +527,48 @@ export default function HomePage() {
 
               {/* Search Results */}
               {showResults && (
-                <Box sx={{ mt: 1, maxHeight: 160, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <Box sx={{ mt: 1, maxHeight: 350, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                   {searchLoading ? (
                     <Box sx={{ p: 2, textAlign: 'center' }}>
                       <CircularProgress size={24} />
                     </Box>
                   ) : searchResults.length > 0 ? (
-                    <List dense disablePadding>
-                      {searchResults.map((book, index) => (
-                        <ListItemButton
-                          key={`${book.title}-${book.author}-${index}`}
-                          onClick={() => handleSelectBook(book)}
-                        >
-                          {book.coverUrl && (
-                            <Avatar
-                              src={book.coverUrl}
-                              variant="rounded"
-                              sx={{ width: 28, height: 42, mr: 1.5 }}
+                    <>
+                      <List dense disablePadding>
+                        {searchResults.map((book, index) => (
+                          <ListItemButton
+                            key={`${book.title}-${book.author}-${index}`}
+                            onClick={() => handleSelectBook(book)}
+                          >
+                            {book.coverUrl && (
+                              <Avatar
+                                src={book.coverUrl}
+                                variant="rounded"
+                                sx={{ width: 28, height: 42, mr: 1.5 }}
+                              />
+                            )}
+                            <ListItemText
+                              primary={book.title}
+                              secondary={book.author || 'Unknown author'}
+                              primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
+                              secondaryTypographyProps={{ noWrap: true }}
                             />
-                          )}
-                          <ListItemText
-                            primary={book.title}
-                            secondary={book.author || 'Unknown author'}
-                            primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
-                            secondaryTypographyProps={{ noWrap: true }}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
+                          </ListItemButton>
+                        ))}
+                      </List>
+                      {hasMoreResults && (
+                        <Box sx={{ p: 1, textAlign: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Button
+                            size="small"
+                            onClick={handleLoadMore}
+                            disabled={loadingMore}
+                            startIcon={loadingMore ? <CircularProgress size={14} /> : null}
+                          >
+                            {loadingMore ? "Loading..." : "Load more results"}
+                          </Button>
+                        </Box>
+                      )}
+                    </>
                   ) : (
                     <Typography variant="body2" sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
                       No results found. Enter details manually below.

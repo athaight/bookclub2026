@@ -1,7 +1,7 @@
 export type BookRow = {
   id: string;
   member_email: string;
-  status: "current" | "completed";
+  status: "current" | "completed" | "wishlist";
   title: string;
   author?: string;
   comment?: string;

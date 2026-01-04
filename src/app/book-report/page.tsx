@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   Typography,
   Box,
@@ -61,9 +61,12 @@ export default function BookReportPage() {
   const [formIsDraft, setFormIsDraft] = useState(false);
 
   // Book search
-  const [bookSearchQuery, setBookSearchQuery] = useState("");
+  const bookSearchInputRef = useRef<HTMLInputElement>(null);
   const [bookSearchResults, setBookSearchResults] = useState<BookSearchResult[]>([]);
   const [searchingBooks, setSearchingBooks] = useState(false);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastQuery, setLastQuery] = useState("");
 
   const members = useMemo(() => getMembers(), []);
 
@@ -162,7 +165,7 @@ export default function BookReportPage() {
     setFormBookCover("");
     setFormContent("");
     setFormIsDraft(false);
-    setBookSearchQuery("");
+    if (bookSearchInputRef.current) bookSearchInputRef.current.value = "";
     setBookSearchResults([]);
     setDialogOpen(true);
   };
@@ -176,18 +179,41 @@ export default function BookReportPage() {
     setFormBookCover(report.book_cover_url || "");
     setFormContent(report.content);
     setFormIsDraft(report.status === "draft");
-    setBookSearchQuery("");
+    if (bookSearchInputRef.current) bookSearchInputRef.current.value = "";
     setBookSearchResults([]);
     setDialogOpen(true);
   };
 
   // Book search
   const handleBookSearch = async () => {
-    if (!bookSearchQuery.trim()) return;
+    const query = bookSearchInputRef.current?.value.trim() || "";
+    if (!query || query.length < 3) return;
     setSearchingBooks(true);
-    const results = await searchBooks(bookSearchQuery);
-    setBookSearchResults(results);
+    setLastQuery(query);
+    const { books, hasMore } = await searchBooks(query, { limit: 30 });
+    setBookSearchResults(books);
+    setHasMoreResults(hasMore);
     setSearchingBooks(false);
+  };
+
+  const handleLoadMore = async () => {
+    if (lastQuery.length < 3) return;
+    setLoadingMore(true);
+    try {
+      const { books: moreResults, hasMore } = await searchBooks(lastQuery, { limit: 30, offset: bookSearchResults.length });
+      if (moreResults.length > 0) {
+        const existingKeys = new Set(bookSearchResults.map(b => `${b.title.toLowerCase()}|${(b.author || '').toLowerCase()}`));
+        const newResults = moreResults.filter(b => !existingKeys.has(`${b.title.toLowerCase()}|${(b.author || '').toLowerCase()}`));
+        setBookSearchResults([...bookSearchResults, ...newResults]);
+        setHasMoreResults(hasMore);
+      } else {
+        setHasMoreResults(false);
+      }
+    } catch (error) {
+      console.error("Load more error:", error);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const handleSelectBook = (book: BookSearchResult) => {
@@ -195,7 +221,7 @@ export default function BookReportPage() {
     setFormBookAuthor(book.author || "");
     setFormBookCover(book.coverUrl || "");
     setBookSearchResults([]);
-    setBookSearchQuery("");
+    if (bookSearchInputRef.current) bookSearchInputRef.current.value = "";
   };
 
   // Save report
@@ -574,8 +600,7 @@ export default function BookReportPage() {
                 <TextField
                   size="small"
                   placeholder="Search by title or author..."
-                  value={bookSearchQuery}
-                  onChange={(e) => setBookSearchQuery(e.target.value)}
+                  inputRef={bookSearchInputRef}
                   onKeyDown={(e) => e.key === "Enter" && handleBookSearch()}
                   sx={{ flex: 1 }}
                 />
@@ -593,7 +618,7 @@ export default function BookReportPage() {
                 <Box
                   sx={{
                     mt: 1,
-                    maxHeight: 200,
+                    maxHeight: 350,
                     overflow: "auto",
                     border: 1,
                     borderColor: "divider",
@@ -634,6 +659,18 @@ export default function BookReportPage() {
                       </Box>
                     </Box>
                   ))}
+                  {hasMoreResults && (
+                    <Box sx={{ p: 1, textAlign: "center", borderTop: 1, borderColor: "divider" }}>
+                      <Button
+                        size="small"
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        startIcon={loadingMore ? <CircularProgress size={14} /> : null}
+                      >
+                        {loadingMore ? "Loading..." : "Load more results"}
+                      </Button>
+                    </Box>
+                  )}
                 </Box>
               )}
             </Box>
