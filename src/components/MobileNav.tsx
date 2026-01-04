@@ -35,14 +35,14 @@ export default function MobileNav() {
     <>
       <IconButton
         edge="start"
-        aria-label="open menu"
+        aria-label="Open navigation menu"
         onClick={() => setOpen(true)}
         sx={{ mr: 1 }}
       >
         <MenuIcon />
       </IconButton>
 
-      <Drawer open={open} onClose={() => setOpen(false)}>
+      <Drawer open={open} onClose={() => setOpen(false)} aria-label="Main navigation menu">
         <Box sx={{ width: 260, height: "100%", display: "flex", flexDirection: "column" }}>
           <List sx={{ flex: 1 }}>
             {navItems.map((item) => (

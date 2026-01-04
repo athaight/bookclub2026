@@ -429,6 +429,7 @@ export default function ProfilesPage() {
             >
               <Avatar
                 src={avatarUrl || undefined}
+                alt={`Profile picture of ${m.name}`}
                 sx={{
                   width: { xs: 120, sm: 180, md: 250 },
                   height: { xs: 120, sm: 180, md: 250 },
@@ -512,6 +513,7 @@ export default function ProfilesPage() {
                           {book.cover_url && (
                             <Avatar
                               src={book.cover_url}
+                              alt={`Cover of ${book.title}`}
                               variant="rounded"
                               sx={{ width: 50, height: 75, flexShrink: 0 }}
                             />
@@ -759,6 +761,7 @@ export default function ProfilesPage() {
                                 {book.coverUrl && (
                                   <Avatar
                                     src={book.coverUrl}
+                                    alt={`Cover of ${book.title}`}
                                     variant="rounded"
                                     sx={{ width: 28, height: 42, mr: 1.5 }}
                                   />
@@ -804,6 +807,7 @@ export default function ProfilesPage() {
                       {book.cover_url && (
                         <Avatar
                           src={book.cover_url}
+                          alt={`Cover of ${book.title}`}
                           variant="rounded"
                           sx={{ width: 50, height: 75, flexShrink: 0, mr: 2 }}
                         />

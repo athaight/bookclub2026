@@ -40,6 +40,7 @@ export default function MemberAvatar({
   const avatar = (
     <Avatar
       src={avatarUrl || undefined}
+      alt={`Avatar of ${name}`}
       sx={{
         width: dimension,
         height: dimension,

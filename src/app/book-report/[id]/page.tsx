@@ -137,6 +137,7 @@ export default function BookReportViewPage({ params }: PageProps) {
             {report.book_cover_url ? (
               <Avatar
                 src={report.book_cover_url}
+                alt={`Cover of ${report.book_title}`}
                 variant="rounded"
                 sx={{
                   width: 120,
@@ -181,6 +182,7 @@ export default function BookReportViewPage({ params }: PageProps) {
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <Avatar
                   src={profile?.avatar_url || undefined}
+                  alt={`Avatar of ${getMemberName(report.user_email)}`}
                   sx={{ width: 32, height: 32 }}
                 >
                   {getMemberName(report.user_email)[0]}

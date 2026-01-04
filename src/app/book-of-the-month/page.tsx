@@ -402,23 +402,35 @@ export default function BookOfTheMonthPage() {
             {bookOfMonth.book_cover_url ? (
               <Avatar
                 src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
+                alt={`Cover of ${bookOfMonth.book_title} by ${bookOfMonth.book_author}`}
                 variant="rounded"
                 onClick={() => setSummaryModalOpen(true)}
+                onKeyDown={(e) => e.key === "Enter" && setSummaryModalOpen(true)}
+                role="button"
+                tabIndex={0}
+                aria-label={`View summary of ${bookOfMonth.book_title}`}
                 sx={{ 
                   width: 336, 
                   height: 504, 
                   boxShadow: 3,
                   cursor: "pointer",
                   transition: "transform 0.2s, box-shadow 0.2s",
-                  "&:hover": {
+                  "&:hover, &:focus": {
                     transform: "scale(1.02)",
                     boxShadow: 6,
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
                   },
                   "& img": { objectFit: "cover" }
                 }}
               />
             ) : (
               <Box
+                onClick={() => setSummaryModalOpen(true)}
+                onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && setSummaryModalOpen(true)}
+                role="button"
+                tabIndex={0}
+                aria-label="No cover image available. Click to view book details."
                 sx={{
                   width: 240,
                   height: 360,
@@ -428,6 +440,11 @@ export default function BookOfTheMonthPage() {
                   alignItems: "center",
                   justifyContent: "center",
                   boxShadow: 3,
+                  cursor: "pointer",
+                  "&:hover, &:focus": {
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
+                  },
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
@@ -494,6 +511,7 @@ export default function BookOfTheMonthPage() {
                 <Box sx={{ flexShrink: 0, display: "flex", justifyContent: "center" }}>
                   <Avatar
                     src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
+                    alt={`Cover of ${bookOfMonth.book_title}`}
                     variant="rounded"
                     sx={{ 
                       width: 200, 
@@ -590,6 +608,7 @@ export default function BookOfTheMonthPage() {
                           {book.coverUrl && (
                             <Avatar
                               src={book.coverUrl}
+                              alt={`Cover of ${book.title}`}
                               variant="rounded"
                               sx={{ width: 32, height: 48, mr: 1 }}
                             />
@@ -634,6 +653,7 @@ export default function BookOfTheMonthPage() {
                   {formCoverUrl ? (
                     <Avatar
                       src={formCoverUrl}
+                      alt={`Cover of ${selectedBook.title}`}
                       variant="rounded"
                       sx={{ width: 60, height: 90 }}
                     />

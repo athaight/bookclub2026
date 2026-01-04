@@ -23,7 +23,11 @@ export default function StarRating({
 
   if (readOnly) {
     return (
-      <Box sx={{ display: "flex", alignItems: "center" }}>
+      <Box 
+        sx={{ display: "flex", alignItems: "center" }} 
+        role="img" 
+        aria-label={`Rating: ${value ?? 0} out of 5 stars`}
+      >
         {stars.map((star) => (
           <Box key={star} sx={{ color: star <= (value ?? 0) ? "warning.main" : "action.disabled" }}>
             {star <= (value ?? 0) ? (
@@ -38,11 +42,12 @@ export default function StarRating({
   }
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center" }}>
+    <Box sx={{ display: "flex", alignItems: "center" }} role="group" aria-label="Rating selection">
       {stars.map((star) => (
         <IconButton
           key={star}
           size="small"
+          aria-label={`Rate ${star} out of 5 stars${value === star ? ', currently selected' : ''}`}
           onClick={() => {
             if (onChange) {
               // If clicking the same star, clear the rating

@@ -397,6 +397,7 @@ export default function BookReportPage() {
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <Avatar
                       src={profile?.avatar_url || undefined}
+                      alt={`Avatar of ${member.name}`}
                       sx={{ width: 48, height: 48 }}
                     >
                       {member.name[0]}
@@ -452,6 +453,7 @@ export default function BookReportPage() {
                               {report.book_cover_url ? (
                                 <Avatar
                                   src={report.book_cover_url}
+                                  alt={`Cover of ${report.book_title}`}
                                   variant="rounded"
                                   sx={{ width: 80, height: 120, flexShrink: 0 }}
                                 />
@@ -653,6 +655,7 @@ export default function BookReportPage() {
                       {book.coverUrl && (
                         <Avatar
                           src={book.coverUrl}
+                          alt={`Cover of ${book.title}`}
                           variant="rounded"
                           sx={{ width: 40, height: 60 }}
                         />
@@ -716,6 +719,7 @@ export default function BookReportPage() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <Avatar
                   src={formBookCover}
+                  alt={`Cover of ${formBookTitle}`}
                   variant="rounded"
                   sx={{ width: 60, height: 90 }}
                 />

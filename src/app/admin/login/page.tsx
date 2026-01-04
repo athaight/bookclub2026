@@ -70,7 +70,7 @@ export default function AdminLoginPage() {
           </Button>
 
           {msg && (
-            <Typography color="error" variant="body2">
+            <Typography color="error" variant="body2" role="alert">
               {msg}
             </Typography>
           )}

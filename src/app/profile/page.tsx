@@ -234,6 +234,7 @@ export default function ProfilePage() {
               <Box sx={{ position: "relative" }}>
                 <Avatar
                   src={avatarUrl || undefined}
+                  alt={`Profile picture of ${displayName || 'user'}`}
                   sx={{ width: 120, height: 120, fontSize: 48 }}
                 >
                   {displayName ? displayName[0].toUpperCase() : "?"}

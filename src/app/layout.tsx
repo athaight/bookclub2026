@@ -27,9 +27,40 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
           {/* Sticky footer page layout */}
           <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+            {/* Skip link for keyboard navigation - uses CSS :focus for visibility */}
+            <Box
+              component="a"
+              href="#main-content"
+              sx={{
+                position: 'absolute',
+                left: '-9999px',
+                top: 'auto',
+                width: '1px',
+                height: '1px',
+                overflow: 'hidden',
+                zIndex: 9999,
+                '&:focus': {
+                  position: 'fixed',
+                  top: '10px',
+                  left: '10px',
+                  width: 'auto',
+                  height: 'auto',
+                  padding: '10px 20px',
+                  backgroundColor: 'primary.main',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '4px',
+                  boxShadow: 3,
+                },
+              }}
+            >
+              Skip to main content
+            </Box>
             <SiteHeader />
 
             <Container
+              component="main"
+              id="main-content"
               maxWidth="lg"
               sx={{ pt: 3, pb: '88px', flex: 1 }}  // 64px footer height + 24px gap
             >

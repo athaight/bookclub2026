@@ -78,6 +78,7 @@ function BookCard({
           {row.cover_url && (
             <Avatar
               src={row.cover_url}
+              alt={`Cover of ${row.title}`}
               variant="rounded"
               sx={{ width: 40, height: 60, flexShrink: 0 }}
             />
@@ -544,6 +545,7 @@ export default function HomePage() {
                             {book.coverUrl && (
                               <Avatar
                                 src={book.coverUrl}
+                                alt={`Cover of ${book.title}`}
                                 variant="rounded"
                                 sx={{ width: 28, height: 42, mr: 1.5 }}
                               />
@@ -584,6 +586,7 @@ export default function HomePage() {
               <Box sx={{ display: 'flex', alignItems: 'center', p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Avatar
                   src={draftCoverUrl}
+                  alt={`Cover of ${draftTitle}`}
                   variant="rounded"
                   sx={{ width: 40, height: 60, mr: 1.5 }}
                 />
@@ -665,6 +668,7 @@ export default function HomePage() {
                   {current.cover_url && (
                     <Avatar
                       src={current.cover_url}
+                      alt={`Cover of ${current.title}`}
                       variant="rounded"
                       sx={{ width: 40, height: 60, flexShrink: 0 }}
                     />

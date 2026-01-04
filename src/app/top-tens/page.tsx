@@ -115,6 +115,7 @@ function TopTenBookCard({
           {row.cover_url && (
             <Avatar
               src={row.cover_url}
+              alt={`Cover of ${row.title}`}
               variant="rounded"
               sx={{ width: 40, height: 60, flexShrink: 0, mt: 0.5 }}
             />
@@ -937,6 +938,7 @@ export default function TopTensPage() {
                           {book.coverUrl && (
                             <Avatar
                               src={book.coverUrl}
+                              alt={`Cover of ${book.title}`}
                               variant="rounded"
                               sx={{ width: 32, height: 48, mr: 1.5 }}
                             />
@@ -979,6 +981,7 @@ export default function TopTensPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Avatar
                 src={formCoverUrl}
+                alt={`Cover of ${formTitle}`}
                 variant="rounded"
                 sx={{ width: 48, height: 72, mr: 2 }}
               />
