@@ -57,22 +57,9 @@ export default function LandingPage() {
             >
               — Mark Twain
             </Typography>
-                  <Button
-                    component={Link}
-                    href="/book-of-the-month"
-                    variant="contained"
-                    size="large"
-                    sx={{
-                      px: 5,
-                      py: 1.5,
-                      fontSize: "1.1rem",
-                      fontWeight: 600,
-                      textTransform: "none",
-                      borderRadius: 2,
-                    }}
-                  >
-                    Enter the Club
-                  </Button>
+          </Box>
+
+          {/* Subheadline */}
           <Typography
             variant="body1"
             sx={{
@@ -91,7 +78,7 @@ export default function LandingPage() {
           {/* CTA Button */}
           <Button
             component={Link}
-            href="/reading-challenge"
+            href="/book-of-the-month"
             variant="contained"
             size="large"
             sx={{
