@@ -76,6 +76,9 @@ export default function BookOfTheMonthPage() {
   const [currentMonth] = useState(getCurrentYearMonth());
   const [bookOfMonth, setBookOfMonth] = useState<BookOfTheMonthRow | null>(null);
   
+  // Summary modal state (for public users clicking cover)
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+
   // Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -211,8 +214,8 @@ export default function BookOfTheMonthPage() {
       const details = await getBookDetails(book);
       setBookSummary(details.summary || null);
       setBookGenre(details.genre || null);
-    } catch (error) {
-      console.error("Error fetching book details:", error);
+    } catch {
+      // Failed to fetch details, user can add manually
     } finally {
       setFetchingDetails(false);
     }
@@ -279,27 +282,21 @@ export default function BookOfTheMonthPage() {
 
       // If user selected a new file, upload it
       if (pendingCoverFile) {
-        console.log("[DEBUG] Uploading cover file:", pendingCoverFile.name);
         const fileExt = pendingCoverFile.name.split(".").pop();
         const fileName = `botm_${currentMonth}_${Date.now()}.${fileExt}`;
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("book-covers")
           .upload(fileName, pendingCoverFile, { upsert: true });
-
-        console.log("[DEBUG] Upload result:", { uploadError, uploadData });
 
         if (uploadError) throw new Error(`Cover upload failed: ${uploadError.message}`);
 
         const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
         finalCoverUrl = urlData.publicUrl;
-        console.log("[DEBUG] Cover URL:", finalCoverUrl);
       } else if (bookOfMonth?.book_cover_url) {
         // Keep existing cover if no new file and we're editing
         finalCoverUrl = bookOfMonth.book_cover_url;
       }
-
-      console.log("[DEBUG] Final cover URL being saved:", finalCoverUrl);
 
       const bookData = {
         year_month: currentMonth,
@@ -313,18 +310,13 @@ export default function BookOfTheMonthPage() {
         updated_at: new Date().toISOString(),
       };
 
-      console.log("[DEBUG] Saving book data:", bookData);
-
       if (bookOfMonth) {
         // Update existing
-        console.log("[DEBUG] Updating existing record with ID:", bookOfMonth.id);
-        const { error, data: updateData } = await supabase
+        const { error } = await supabase
           .from("book_of_the_month")
           .update(bookData)
-          .eq("id", bookOfMonth.id)
-          .select();
+          .eq("id", bookOfMonth.id);
 
-        console.log("[DEBUG] Update result - error:", error, "data:", updateData);
         if (error) throw new Error(error.message);
       } else {
         // Insert new
@@ -336,13 +328,12 @@ export default function BookOfTheMonthPage() {
       }
 
       // Refresh data
-      const { data, error: refreshError } = await supabase
+      const { data } = await supabase
         .from("book_of_the_month")
         .select("*")
         .eq("year_month", currentMonth)
         .single();
 
-      console.log("[DEBUG] Refreshed data:", data, "Error:", refreshError);
       if (data) setBookOfMonth(data);
 
       handleCloseDialog();
@@ -406,16 +397,23 @@ export default function BookOfTheMonthPage() {
             by {bookOfMonth.book_author}
           </Typography>
 
-          {/* Large Cover with Upload Option */}
+          {/* Large Cover - Click to view summary */}
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 4 }}>
             {bookOfMonth.book_cover_url ? (
               <Avatar
                 src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
                 variant="rounded"
+                onClick={() => setSummaryModalOpen(true)}
                 sx={{ 
                   width: 336, 
                   height: 504, 
                   boxShadow: 3,
+                  cursor: "pointer",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  "&:hover": {
+                    transform: "scale(1.02)",
+                    boxShadow: 6,
+                  },
                   "& img": { objectFit: "cover" }
                 }}
               />
@@ -436,6 +434,15 @@ export default function BookOfTheMonthPage() {
                   No cover image
                 </Typography>
               </Box>
+            )}
+            {bookOfMonth.book_summary && (
+              <Typography 
+                variant="caption" 
+                sx={{ mt: 1, color: "text.secondary", cursor: "pointer" }}
+                onClick={() => setSummaryModalOpen(true)}
+              >
+                Click cover to view summary
+              </Typography>
             )}
           </Box>
 
@@ -484,6 +491,71 @@ export default function BookOfTheMonthPage() {
           )}
         </Box>
       )}
+
+      {/* Summary Modal - Opens when clicking cover */}
+      <Dialog 
+        open={summaryModalOpen} 
+        onClose={() => setSummaryModalOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: { 
+            bgcolor: "background.paper",
+            backgroundImage: "none",
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 0 }}>
+          {bookOfMonth && (
+            <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 3, p: 3 }}>
+              {/* Cover Image */}
+              {bookOfMonth.book_cover_url && (
+                <Box sx={{ flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                  <Avatar
+                    src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
+                    variant="rounded"
+                    sx={{ 
+                      width: 200, 
+                      height: 300, 
+                      boxShadow: 3,
+                      "& img": { objectFit: "cover" }
+                    }}
+                  />
+                </Box>
+              )}
+              
+              {/* Book Details */}
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  {bookOfMonth.book_title}
+                </Typography>
+                <Typography variant="subtitle1" sx={{ color: "text.secondary", mb: 2 }}>
+                  by {bookOfMonth.book_author}
+                </Typography>
+                
+                {bookOfMonth.book_genre && (
+                  <Typography variant="body2" sx={{ mb: 2, color: "primary.main", fontStyle: "italic" }}>
+                    {bookOfMonth.book_genre}
+                  </Typography>
+                )}
+                
+                {bookOfMonth.book_summary ? (
+                  <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                    {bookOfMonth.book_summary}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+                    No summary available for this book.
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSummaryModalOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -649,6 +721,18 @@ export default function BookOfTheMonthPage() {
                 </Box>
               </Box>
             )}
+
+            {/* Book Summary - editable by admin */}
+            <TextField
+              label="Book Summary"
+              value={bookSummary || ""}
+              onChange={(e) => setBookSummary(e.target.value)}
+              multiline
+              rows={4}
+              placeholder="Add a summary of the book..."
+              fullWidth
+              helperText={bookSummary ? "" : "No summary from API - add your own!"}
+            />
 
             {/* Why Picked */}
             <TextField
