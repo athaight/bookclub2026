@@ -446,25 +446,6 @@ export default function BookOfTheMonthPage() {
             )}
           </Box>
 
-          {/* Book Summary Accordion */}
-          {bookOfMonth.book_summary && (
-            <Accordion sx={{ mb: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">Book Summary</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                {bookOfMonth.book_genre && (
-                  <Typography variant="body2" sx={{ mb: 2, color: "text.secondary", fontStyle: "italic" }}>
-                    Genre: {bookOfMonth.book_genre}
-                  </Typography>
-                )}
-                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                  {bookOfMonth.book_summary}
-                </Typography>
-              </AccordionDetails>
-            </Accordion>
-          )}
-
           {/* Why Picked Accordion */}
           {bookOfMonth.why_picked && currentPicker && (
             <Accordion sx={{ mb: 2 }}>
