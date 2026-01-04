@@ -266,7 +266,8 @@ export default function HomePage() {
     const bucket = byEmail[r.member_email];
     if (!bucket) continue;
     if (r.status === "current") bucket.current.push(r);
-    else bucket.completed.push(r);
+    else if (r.status === "completed") bucket.completed.push(r);
+    // Ignore other statuses like "library" or "wishlist" for reading challenge stats
   }
 
   for (const email of Object.keys(byEmail)) {
