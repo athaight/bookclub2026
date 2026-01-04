@@ -57,22 +57,22 @@ export default function LandingPage() {
             >
               — Mark Twain
             </Typography>
-          </Box>
-
-          {/* Welcome */}
-          <Typography
-            variant="h4"
-            component="h2"
-            sx={{
-              fontWeight: 600,
-              mb: 2,
-              fontSize: { xs: "1.5rem", sm: "1.75rem", md: "2rem" },
-            }}
-          >
-            Welcome to the club!
-          </Typography>
-
-          {/* Description */}
+                  <Button
+                    component={Link}
+                    href="/book-of-the-month"
+                    variant="contained"
+                    size="large"
+                    sx={{
+                      px: 5,
+                      py: 1.5,
+                      fontSize: "1.1rem",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: 2,
+                    }}
+                  >
+                    Enter the Club
+                  </Button>
           <Typography
             variant="body1"
             sx={{

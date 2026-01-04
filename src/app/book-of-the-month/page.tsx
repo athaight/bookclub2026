@@ -23,6 +23,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
+import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookOfTheMonthRow } from "@/types";
@@ -83,6 +84,8 @@ export default function BookOfTheMonthPage() {
   const [fetchingDetails, setFetchingDetails] = useState(false);
   const [bookSummary, setBookSummary] = useState<string | null>(null);
   const [bookGenre, setBookGenre] = useState<string | null>(null);
+  const [formCoverUrl, setFormCoverUrl] = useState<string | null>(null);
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
 
   // Search state
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +199,8 @@ export default function BookOfTheMonthPage() {
 
   async function handleSelectBook(book: BookSearchResult) {
     setSelectedBook(book);
+    setFormCoverUrl(book.coverUrl || null);
+    setPendingCoverFile(null);
     setSearchResults([]);
     setShowResults(false);
     if (searchInputRef.current) searchInputRef.current.value = "";
@@ -225,12 +230,15 @@ export default function BookOfTheMonthPage() {
       setBookSummary(bookOfMonth.book_summary || null);
       setBookGenre(bookOfMonth.book_genre || null);
       setFormWhyPicked(bookOfMonth.why_picked || "");
+      setFormCoverUrl(bookOfMonth.book_cover_url || null);
     } else {
       setSelectedBook(null);
       setBookSummary(null);
       setBookGenre(null);
       setFormWhyPicked("");
+      setFormCoverUrl(null);
     }
+    setPendingCoverFile(null);
     setDialogOpen(true);
   }
 
@@ -240,9 +248,23 @@ export default function BookOfTheMonthPage() {
     setBookSummary(null);
     setBookGenre(null);
     setFormWhyPicked("");
+    setFormCoverUrl(null);
+    setPendingCoverFile(null);
     setSearchResults([]);
     setShowResults(false);
     if (searchInputRef.current) searchInputRef.current.value = "";
+  }
+
+  // Handle cover file selection in the edit dialog
+  function handleDialogCoverSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!event.target.files || event.target.files.length === 0) return;
+    
+    const file = event.target.files[0];
+    setPendingCoverFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setFormCoverUrl(previewUrl);
   }
 
   async function handleSave() {
@@ -251,25 +273,58 @@ export default function BookOfTheMonthPage() {
     setSaving(true);
 
     try {
+      // Determine final cover URL
+      // Start with the original cover from the book or API
+      let finalCoverUrl = selectedBook.coverUrl || null;
+
+      // If user selected a new file, upload it
+      if (pendingCoverFile) {
+        console.log("[DEBUG] Uploading cover file:", pendingCoverFile.name);
+        const fileExt = pendingCoverFile.name.split(".").pop();
+        const fileName = `botm_${currentMonth}_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from("book-covers")
+          .upload(fileName, pendingCoverFile, { upsert: true });
+
+        console.log("[DEBUG] Upload result:", { uploadError, uploadData });
+
+        if (uploadError) throw new Error(`Cover upload failed: ${uploadError.message}`);
+
+        const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
+        finalCoverUrl = urlData.publicUrl;
+        console.log("[DEBUG] Cover URL:", finalCoverUrl);
+      } else if (bookOfMonth?.book_cover_url) {
+        // Keep existing cover if no new file and we're editing
+        finalCoverUrl = bookOfMonth.book_cover_url;
+      }
+
+      console.log("[DEBUG] Final cover URL being saved:", finalCoverUrl);
+
       const bookData = {
         year_month: currentMonth,
         picker_email: currentPickerEmail,
         book_title: selectedBook.title,
         book_author: selectedBook.author,
-        book_cover_url: selectedBook.coverUrl || null,
+        book_cover_url: finalCoverUrl || null,
         book_summary: bookSummary || null,
         book_genre: bookGenre || null,
         why_picked: formWhyPicked.trim() || null,
         updated_at: new Date().toISOString(),
       };
 
+      console.log("[DEBUG] Saving book data:", bookData);
+
       if (bookOfMonth) {
         // Update existing
-        const { error } = await supabase
+        console.log("[DEBUG] Updating existing record with ID:", bookOfMonth.id);
+        const { error, data: updateData } = await supabase
           .from("book_of_the_month")
           .update(bookData)
-          .eq("id", bookOfMonth.id);
+          .eq("id", bookOfMonth.id)
+          .select();
 
+        console.log("[DEBUG] Update result - error:", error, "data:", updateData);
         if (error) throw new Error(error.message);
       } else {
         // Insert new
@@ -281,12 +336,13 @@ export default function BookOfTheMonthPage() {
       }
 
       // Refresh data
-      const { data } = await supabase
+      const { data, error: refreshError } = await supabase
         .from("book_of_the_month")
         .select("*")
         .eq("year_month", currentMonth)
         .single();
 
+      console.log("[DEBUG] Refreshed data:", data, "Error:", refreshError);
       if (data) setBookOfMonth(data);
 
       handleCloseDialog();
@@ -332,7 +388,7 @@ export default function BookOfTheMonthPage() {
               </Typography>
             </Box>
           )}
-          {isCurrentPicker && (
+          {authedEmail && (
             <IconButton onClick={handleOpenDialog} color="primary" size="small">
               <EditIcon fontSize="small" />
             </IconButton>
@@ -350,21 +406,38 @@ export default function BookOfTheMonthPage() {
             by {bookOfMonth.book_author}
           </Typography>
 
-          {/* Large Cover */}
-          {bookOfMonth.book_cover_url && (
-            <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
+          {/* Large Cover with Upload Option */}
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 4 }}>
+            {bookOfMonth.book_cover_url ? (
               <Avatar
                 src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
                 variant="rounded"
                 sx={{ 
-                  width: 200, 
-                  height: 300, 
+                  width: 336, 
+                  height: 504, 
                   boxShadow: 3,
                   "& img": { objectFit: "cover" }
                 }}
               />
-            </Box>
-          )}
+            ) : (
+              <Box
+                sx={{
+                  width: 240,
+                  height: 360,
+                  bgcolor: "action.hover",
+                  borderRadius: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: 3,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  No cover image
+                </Typography>
+              </Box>
+            )}
+          </Box>
 
           {/* Book Summary Accordion */}
           {bookOfMonth.book_summary && (
@@ -404,7 +477,7 @@ export default function BookOfTheMonthPage() {
           <Typography variant="h6" sx={{ color: "text.secondary", mb: 2 }}>
             No book selected yet for {formatMonthYear(currentMonth)}
           </Typography>
-          {isCurrentPicker && (
+          {authedEmail && (
             <Button variant="contained" onClick={handleOpenDialog}>
               Pick This Month&apos;s Book
             </Button>
@@ -503,34 +576,75 @@ export default function BookOfTheMonthPage() {
                 p: 2, 
                 bgcolor: "action.hover", 
                 borderRadius: 1,
-                display: "flex",
-                gap: 2,
-                alignItems: "flex-start"
               }}>
-                {selectedBook.coverUrl && (
-                  <Avatar
-                    src={selectedBook.coverUrl}
-                    variant="rounded"
-                    sx={{ width: 60, height: 90 }}
-                  />
-                )}
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    {selectedBook.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    by {selectedBook.author}
-                  </Typography>
-                  {fetchingDetails ? (
-                    <Typography variant="caption" color="text.secondary">
-                      Fetching details...
-                    </Typography>
+                <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+                  {formCoverUrl ? (
+                    <Avatar
+                      src={formCoverUrl}
+                      variant="rounded"
+                      sx={{ width: 60, height: 90 }}
+                    />
                   ) : (
-                    bookGenre && (
-                      <Typography variant="caption" color="text.secondary">
-                        Genre: {bookGenre}
+                    <Box
+                      sx={{
+                        width: 60,
+                        height: 90,
+                        bgcolor: "action.disabledBackground",
+                        borderRadius: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", px: 0.5 }}>
+                        No cover
                       </Typography>
-                    )
+                    </Box>
+                  )}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      {selectedBook.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      by {selectedBook.author}
+                    </Typography>
+                    {fetchingDetails ? (
+                      <Typography variant="caption" color="text.secondary">
+                        Fetching details...
+                      </Typography>
+                    ) : (
+                      bookGenre && (
+                        <Typography variant="caption" color="text.secondary">
+                          Genre: {bookGenre}
+                        </Typography>
+                      )
+                    )}
+                  </Box>
+                </Box>
+                
+                {/* Cover Upload in Dialog */}
+                <Box sx={{ mt: 2 }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleDialogCoverSelect}
+                    style={{ display: "none" }}
+                    id="dialog-cover-upload"
+                  />
+                  <label htmlFor="dialog-cover-upload">
+                    <Button
+                      component="span"
+                      variant="outlined"
+                      size="small"
+                      startIcon={<AddPhotoAlternateIcon />}
+                    >
+                      {formCoverUrl ? "Change Cover Image" : "Upload Cover Image"}
+                    </Button>
+                  </label>
+                  {pendingCoverFile && (
+                    <Typography variant="caption" color="success.main" sx={{ ml: 1 }}>
+                      New image selected
+                    </Typography>
                   )}
                 </Box>
               </Box>
