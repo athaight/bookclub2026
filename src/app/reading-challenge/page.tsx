@@ -609,11 +609,12 @@ export default function HomePage() {
             <TextField
               label="Why this book?"
               value={draftComment}
-              onChange={(e) => setDraftComment(e.target.value.slice(0, 200))}
+              onChange={(e) => setDraftComment(e.target.value)}
               helperText={`${draftComment.length}/200`}
               multiline
               minRows={2}
               fullWidth
+              inputProps={{ maxLength: 200 }}
             />
 
             <FormControlLabel

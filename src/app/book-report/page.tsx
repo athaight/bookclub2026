@@ -59,6 +59,16 @@ export default function BookReportPage() {
   const [formBookCover, setFormBookCover] = useState("");
   const [formContent, setFormContent] = useState("");
   const [formIsDraft, setFormIsDraft] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+
+  // Debounced word count calculation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const words = formContent.trim().split(/\s+/).filter(Boolean).length;
+      setWordCount(words);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [formContent]);
 
   // Book search
   const bookSearchInputRef = useRef<HTMLInputElement>(null);
@@ -727,11 +737,7 @@ export default function BookReportPage() {
 
             {/* Word count */}
             <Typography variant="caption" color="text.secondary">
-              {formContent.trim().split(/\s+/).filter(Boolean).length} words •{" "}
-              {Math.ceil(
-                formContent.trim().split(/\s+/).filter(Boolean).length / 200
-              )}{" "}
-              min read
+              {wordCount} words • {Math.ceil(wordCount / 200)} min read
             </Typography>
 
             {/* Save as Draft Toggle */}

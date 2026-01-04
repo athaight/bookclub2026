@@ -33,6 +33,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -50,11 +51,15 @@ function LibraryBookCard({
   isOwner,
   onDelete,
   onEdit,
+  onAdd,
+  canAdd,
 }: {
   row: BookRow;
   isOwner?: boolean;
   onDelete?: (row: BookRow) => void;
   onEdit?: (row: BookRow) => void;
+  onAdd?: (row: BookRow) => void;
+  canAdd?: boolean;
 }) {
   return (
     <Card sx={{ mb: 1 }}>
@@ -84,7 +89,7 @@ function LibraryBookCard({
             )}
           </Box>
 
-          {isOwner && (
+          {isOwner ? (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               {onEdit && (
                 <IconButton
@@ -106,6 +111,18 @@ function LibraryBookCard({
                 </IconButton>
               )}
             </Box>
+          ) : (
+            canAdd && onAdd && (
+              <IconButton
+                aria-label="add to my list"
+                onClick={() => onAdd(row)}
+                size="small"
+                color="primary"
+                title="Add to my list"
+              >
+                <BookmarkBorderIcon fontSize="small" />
+              </IconButton>
+            )
           )}
         </Box>
       </CardContent>
@@ -162,6 +179,12 @@ export default function OurLibrariesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<BookRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Add to list state (for adding books from other users' libraries)
+  const [myAllBooks, setMyAllBooks] = useState<BookRow[]>([]);
+  const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
+  const [bookToAdd, setBookToAdd] = useState<BookRow | null>(null);
+  const [addingBook, setAddingBook] = useState(false);
 
   useEffect(() => {
     const init: Record<string, boolean> = {};
@@ -261,6 +284,80 @@ export default function OurLibrariesPage() {
     if (!checkingSession) refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkingSession]);
+
+  // Fetch all books for the current user (to check for duplicates)
+  useEffect(() => {
+    async function fetchMyBooks() {
+      if (!authedEmail) {
+        setMyAllBooks([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("books")
+        .select("*")
+        .eq("member_email", authedEmail);
+      setMyAllBooks((data ?? []) as BookRow[]);
+    }
+    fetchMyBooks();
+  }, [authedEmail]);
+
+  // Check if user already has this book
+  function userHasBook(title: string, author: string): boolean {
+    const normTitle = title.toLowerCase().trim();
+    const normAuthor = (author || "").toLowerCase().trim();
+    return myAllBooks.some(
+      (b) =>
+        (b.title || "").toLowerCase().trim() === normTitle &&
+        (b.author || "").toLowerCase().trim() === normAuthor
+    );
+  }
+
+  // Handle clicking add button on another user's book
+  function handleAddToListClick(book: BookRow) {
+    setBookToAdd(book);
+    setAddToListDialogOpen(true);
+  }
+
+  // Add book to library or wishlist
+  async function handleConfirmAddToList(destination: "library" | "wishlist") {
+    if (!authedEmail || !bookToAdd) return;
+
+    setAddingBook(true);
+
+    try {
+      const { error } = await supabase.from("books").insert({
+        member_email: authedEmail,
+        title: bookToAdd.title,
+        author: bookToAdd.author || "",
+        cover_url: bookToAdd.cover_url || null,
+        genre: bookToAdd.genre || null,
+        status: destination === "library" ? "completed" : "wishlist",
+        in_library: destination === "library",
+        top_ten: false,
+        rating: null,
+        comment: "",
+        reading_challenge_year: null, // Don't add to reading challenge
+      });
+
+      if (error) throw new Error(error.message);
+
+      // Refresh data
+      await refresh();
+      // Refresh user's books for duplicate checking
+      const { data } = await supabase
+        .from("books")
+        .select("*")
+        .eq("member_email", authedEmail);
+      setMyAllBooks((data ?? []) as BookRow[]);
+
+      setAddToListDialogOpen(false);
+      setBookToAdd(null);
+    } catch (e) {
+      alert(`Error adding book: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setAddingBook(false);
+    }
+  }
 
   // Search handlers
   async function handleSearch() {
@@ -555,6 +652,8 @@ export default function OurLibrariesPage() {
               isOwner={isOwner}
               onDelete={handleDeleteClick}
               onEdit={handleEditClick}
+              onAdd={handleAddToListClick}
+              canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
             />
           ))
         ) : (
@@ -593,6 +692,8 @@ export default function OurLibrariesPage() {
               isOwner={isOwner}
               onDelete={handleDeleteClick}
               onEdit={handleEditClick}
+              onAdd={handleAddToListClick}
+              canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
             />
           ))
         ) : (
@@ -918,6 +1019,55 @@ export default function OurLibrariesPage() {
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleting}>
             {deleting ? "Removing..." : "Remove"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add to List Confirmation Dialog */}
+      <Dialog
+        open={addToListDialogOpen}
+        onClose={() => {
+          if (!addingBook) {
+            setAddToListDialogOpen(false);
+            setBookToAdd(null);
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Add to Your List</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            Where would you like to add <strong>{bookToAdd?.title}</strong>?
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={() => handleConfirmAddToList("library")}
+              disabled={addingBook}
+              fullWidth
+            >
+              {addingBook ? "Adding..." : "Add to My Library"}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => handleConfirmAddToList("wishlist")}
+              disabled={addingBook}
+              fullWidth
+            >
+              {addingBook ? "Adding..." : "Add to My Wishlist"}
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setAddToListDialogOpen(false);
+              setBookToAdd(null);
+            }}
+            disabled={addingBook}
+          >
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>

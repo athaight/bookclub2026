@@ -36,3 +36,17 @@ export type BookReportRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type BookOfTheMonthRow = {
+  id: string;
+  year_month: string; // Format: "2026-01"
+  picker_email: string;
+  book_title: string;
+  book_author: string;
+  book_cover_url?: string | null;
+  book_summary?: string | null;
+  book_genre?: string | null;
+  why_picked?: string | null;
+  created_at: string;
+  updated_at: string;
+};

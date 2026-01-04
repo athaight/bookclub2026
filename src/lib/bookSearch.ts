@@ -190,3 +190,67 @@ export async function searchBooks(query: string, options?: { limit?: number; off
     }
   }
 }
+
+// Extended book details including summary/description
+export interface BookDetails extends BookSearchResult {
+  summary?: string;
+}
+
+// Fetch detailed book info including summary from Open Library
+export async function getBookDetails(book: BookSearchResult): Promise<BookDetails> {
+  try {
+    // If we have a key from Open Library, use it to get the work details
+    if (book.key) {
+      // The key is like "/works/OL123W" - we need to fetch that endpoint
+      const workResponse = await fetch(`https://openlibrary.org${book.key}.json`);
+      
+      if (workResponse.ok) {
+        const workData = await workResponse.json();
+        
+        // Description can be a string or an object with "value" property
+        let summary: string | undefined;
+        if (workData.description) {
+          summary = typeof workData.description === 'string' 
+            ? workData.description 
+            : workData.description.value;
+        }
+        
+        // Get genre from subjects if not already present
+        const genre = book.genre || pickBestGenre(workData.subjects);
+        
+        return {
+          ...book,
+          summary,
+          genre,
+        };
+      }
+    }
+    
+    // Fallback: try Google Books API for description
+    const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_BOOKS_API_KEY;
+    const searchQuery = `${book.title} ${book.author}`;
+    const url = googleApiKey
+      ? `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=1&key=${googleApiKey}`
+      : `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=1`;
+    
+    const response = await fetch(url);
+    
+    if (response.ok) {
+      const data = await response.json();
+      const item = data.items?.[0];
+      
+      if (item?.volumeInfo) {
+        return {
+          ...book,
+          summary: item.volumeInfo.description,
+          genre: book.genre || pickBestGenre(item.volumeInfo.categories),
+        };
+      }
+    }
+    
+    return book;
+  } catch (error) {
+    console.warn('Failed to fetch book details:', error);
+    return book;
+  }
+}
