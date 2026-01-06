@@ -34,7 +34,13 @@ import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
+import AutoStoriesIcon from "@mui/icons-material/AutoStories";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Tooltip from "@mui/material/Tooltip";
+import Link from "next/link";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
 import { supabase } from "@/lib/supabaseClient";
@@ -52,6 +58,10 @@ function getInitials(name: string): string {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
+}
+
+function getFirstName(name: string): string {
+  return name.trim().split(/\s+/)[0];
 }
 
 export default function ProfilesPage() {
@@ -435,10 +445,17 @@ export default function ProfilesPage() {
     }).sort((a, b) => b.completedCount - a.completedCount);
     
     const rankIndex = memberScores.findIndex((s) => s.email === selectedMember.email);
+    const rankNumber = rankIndex + 1;
     const rankLabel = rankIndex === 0 ? "Bibliophile" : rankIndex === 1 ? "Bookworm" : "Bookish";
     
     // Library stats
     const libraryBooks = books.filter((b) => b.in_library);
+    
+    // Top Ten books
+    const topTenBooks = books
+      .filter((b) => b.top_ten)
+      .sort((a, b) => (a.top_ten_rank || 99) - (b.top_ten_rank || 99))
+      .slice(0, 10);
     
     // Genre counts
     const genreCounts: Record<string, number> = {};
@@ -459,16 +476,19 @@ export default function ProfilesPage() {
     return {
       currentBooks,
       booksRead: completedChallengeBooks.length,
+      rankNumber,
       rankLabel,
       monthlyData,
       totalLibraryBooks: libraryBooks.length,
+      libraryBooks,
+      topTenBooks,
       genres: sortedGenres,
       wishlistBooks,
     };
   }, [selectedMember, memberBooks, members]);
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Page Title */}
       <Typography
         variant="h3"
@@ -522,9 +542,9 @@ export default function ProfilesPage() {
                 src={avatarUrl || undefined}
                 alt={`Profile picture of ${m.name}`}
                 sx={{
-                  width: { xs: 120, sm: 180, md: 250 },
-                  height: { xs: 120, sm: 180, md: 250 },
-                  fontSize: { xs: 40, sm: 60, md: 80 },
+                  width: { xs: 80, sm: 100, md: 120 },
+                  height: { xs: 80, sm: 100, md: 120 },
+                  fontSize: { xs: 28, sm: 36, md: 44 },
                   border: isSelected ? "4px solid #667eea" : "4px solid transparent",
                   boxShadow: isSelected
                     ? "0 8px 32px rgba(102, 126, 234, 0.4)"
@@ -535,186 +555,405 @@ export default function ProfilesPage() {
                 {!avatarUrl && getInitials(m.name)}
               </Avatar>
               <Typography
-                variant="h5"
+                variant="h6"
                 component="h2"
                 sx={{
-                  mt: 2,
+                  mt: 1.5,
                   fontWeight: 600,
                   color: isSelected ? "primary.main" : "text.primary",
-                  fontSize: { xs: "1.1rem", sm: "1.5rem" },
                 }}
               >
-                {m.name}
+                {getFirstName(m.name)}
               </Typography>
             </Box>
           );
         })}
       </Box>
 
-      {/* Divider */}
-      <Divider sx={{ my: 4 }} />
-
       {/* Instructions Header */}
       {!selectedMember && (
         <Typography
           variant="h6"
           align="center"
-          sx={{ color: "text.secondary", mb: 4 }}
+          sx={{ color: "text.secondary", mt: 4 }}
         >
-          Click a user to see their stats
+          Click a member to see their dashboard
         </Typography>
       )}
 
-      {/* Stats Section */}
+      {/* Dashboard Content */}
       {selectedMember && stats && (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {/* Reading Challenge Card */}
-          <Card elevation={2}>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                <MenuBookIcon color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  2026 Reading Challenge
-                </Typography>
-              </Box>
-              
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Current ranking:
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
-                {stats.rankLabel}
-              </Typography>
-              
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                }}
-              >
-                {/* Current Book */}
-                <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                  {stats.currentBooks.length > 0 ? (
-                    <>
-                      <Typography variant="body2" color="text.secondary">
-                        Currently Reading ({stats.currentBooks.length})
-                      </Typography>
-                      {stats.currentBooks.map((book) => (
-                        <Box key={book.id} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                          {book.cover_url && (
-                            <Avatar
-                              src={book.cover_url}
-                              alt={`Cover of ${book.title}`}
-                              variant="rounded"
-                              sx={{ width: 50, height: 75, flexShrink: 0 }}
-                            />
-                          )}
-                          <Box>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {book.title}
-                            </Typography>
-                            {book.author && (
-                              <Typography variant="body2" color="text.secondary">
-                                by {book.author}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-                      ))}
-                    </>
-                  ) : (
-                    <Typography variant="body1" color="text.secondary">
-                      No current book
+        <>
+          {/* Hero Banner */}
+          <Card
+            sx={{
+              mb: 3,
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              color: "white",
+            }}
+          >
+            <CardContent sx={{ py: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <Avatar
+                  src={profiles[selectedMember.email]?.avatar_url || undefined}
+                  alt={getFirstName(selectedMember.name)}
+                  sx={{
+                    width: { xs: 80, sm: 100 },
+                    height: { xs: 80, sm: 100 },
+                    fontSize: { xs: 32, sm: 40 },
+                    border: "3px solid rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {!profiles[selectedMember.email]?.avatar_url && getInitials(selectedMember.name)}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {getFirstName(selectedMember.name)}
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                    <EmojiEventsIcon sx={{ fontSize: 20 }} />
+                    <Typography variant="body1">
+                      Rank #{stats.rankNumber} • {stats.rankLabel}
                     </Typography>
-                  )}
+                  </Box>
                 </Box>
-
-                {/* Vertical Divider */}
-                <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-
-                {/* Books Read Count */}
-                <Box sx={{ textAlign: "center", minWidth: 100 }}>
-                  <Typography
-                    variant="h2"
-                    sx={{
-                      fontWeight: 700,
-                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                      backgroundClip: "text",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                    }}
-                  >
-                    {stats.booksRead}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    books read
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Monthly Reading Chart */}
-              <Divider sx={{ my: 3 }} />
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                Books Completed by Month
-              </Typography>
-              <Box sx={{ width: "100%", height: 250 }}>
-                <BarChart
-                  xAxis={[
-                    {
-                      scaleType: "band",
-                      data: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-                    },
-                  ]}
-                  series={[
-                    {
-                      data: stats.monthlyData,
-                      color: "#667eea",
-                    },
-                  ]}
-                  height={250}
-                  margin={{ top: 20, bottom: 30, left: 40, right: 20 }}
-                />
               </Box>
             </CardContent>
           </Card>
 
-          {/* Library Stats Card */}
-          <Card elevation={2}>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                <LibraryBooksIcon color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Library Stats
+          {/* Stats Cards Row */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" },
+              gap: 2,
+              mb: 3,
+            }}
+          >
+            {/* Books Read This Year */}
+            <Card sx={{ textAlign: "center" }}>
+              <CardContent>
+                <CheckCircleIcon sx={{ fontSize: 32, color: "success.main", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 700, color: "success.main" }}>
+                  {stats.booksRead}
                 </Typography>
-              </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Read in 2026
+                </Typography>
+              </CardContent>
+            </Card>
 
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Total Books
+            {/* Currently Reading */}
+            <Card sx={{ textAlign: "center" }}>
+              <CardContent>
+                <AutoStoriesIcon sx={{ fontSize: 32, color: "primary.main", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 700, color: "primary.main" }}>
+                  {stats.currentBooks.length}
                 </Typography>
-                <Typography
-                  variant="h3"
-                  sx={{
-                    fontWeight: 700,
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    backgroundClip: "text",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}
-                >
+                <Typography variant="body2" color="text.secondary">
+                  Reading Now
+                </Typography>
+              </CardContent>
+            </Card>
+
+            {/* Library Size */}
+            <Card sx={{ textAlign: "center" }}>
+              <CardContent>
+                <LibraryBooksIcon sx={{ fontSize: 32, color: "secondary.main", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 700, color: "secondary.main" }}>
                   {stats.totalLibraryBooks}
                 </Typography>
-              </Box>
+                <Typography variant="body2" color="text.secondary">
+                  In Library
+                </Typography>
+              </CardContent>
+            </Card>
 
-              {/* Genre Pie Chart */}
-              {stats.genres.length > 0 && (
-                <Box sx={{ mb: "24px" }}>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
+            {/* Wishlist */}
+            <Card sx={{ textAlign: "center" }}>
+              <CardContent>
+                <BookmarkIcon sx={{ fontSize: 32, color: "warning.main", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 700, color: "warning.main" }}>
+                  {stats.wishlistBooks.length}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Wishlist
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Two Column Layout */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: 3,
+              mb: 3,
+            }}
+          >
+            {/* Reading Challenge Progress */}
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <MenuBookIcon color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    2026 Reading Challenge
+                  </Typography>
+                </Box>
+                
+                {/* Progress Bar */}
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Progress
+                    </Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {stats.booksRead} / 26 books
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: "grey.200",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        height: "100%",
+                        width: `${Math.min((stats.booksRead / 26) * 100, 100)}%`,
+                        background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
+                        borderRadius: 4,
+                        transition: "width 0.5s ease",
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Monthly Chart */}
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Books by Month
+                </Typography>
+                <Box sx={{ width: "100%", height: 180 }}>
+                  <BarChart
+                    xAxis={[
+                      {
+                        scaleType: "band",
+                        data: ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"],
+                      },
+                    ]}
+                    series={[
+                      {
+                        data: stats.monthlyData,
+                        color: "#667eea",
+                      },
+                    ]}
+                    height={180}
+                    margin={{ top: 10, bottom: 25, left: 30, right: 10 }}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Currently Reading */}
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <AutoStoriesIcon color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Currently Reading
+                  </Typography>
+                </Box>
+
+                {stats.currentBooks.length > 0 ? (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {stats.currentBooks.map((book) => (
+                      <Box key={book.id} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <BookCoverImage
+                          coverUrl={book.cover_url}
+                          title={book.title}
+                          width={50}
+                          height={75}
+                        />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 500 }} noWrap>
+                            {book.title}
+                          </Typography>
+                          {book.author && (
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                              by {book.author}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                    No books currently being read
+                  </Typography>
+                )}
+
+                <Divider sx={{ my: 2 }} />
+
+                <Link href="/reading-challenge" passHref style={{ textDecoration: "none" }}>
+                  <Button
+                    variant="text"
+                    endIcon={<ArrowForwardIcon />}
+                    sx={{ textTransform: "none" }}
+                  >
+                    View Reading Challenge
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Second Row - Wishlist and Genre Stats */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: 3,
+              mb: 3,
+            }}
+          >
+            {/* Wishlist */}
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <BookmarkIcon color="warning" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Wishlist
+                  </Typography>
+                </Box>
+
+                {/* Search - only show if viewing own profile */}
+                {authedEmail === selectedMember?.email && (
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <TextField
+                        placeholder="Search to add..."
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        inputRef={wishlistSearchInputRef}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleWishlistSearch();
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={handleWishlistSearch}
+                        disabled={wishlistSearchLoading}
+                        sx={{ minWidth: "auto", px: 2 }}
+                      >
+                        {wishlistSearchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
+                      </Button>
+                    </Box>
+
+                    {/* Search Results */}
+                    {showWishlistResults && (
+                      <Box sx={{ mt: 1, maxHeight: 200, overflow: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+                        {wishlistSearchLoading ? (
+                          <Box sx={{ p: 2, textAlign: "center" }}>
+                            <CircularProgress size={24} />
+                          </Box>
+                        ) : wishlistSearchResults.length > 0 ? (
+                          <List dense disablePadding>
+                            {wishlistSearchResults.slice(0, 5).map((book, index) => (
+                              <ListItemButton
+                                key={`${book.title}-${book.author}-${index}`}
+                                onClick={() => addToWishlist(book)}
+                                disabled={addingWishlist}
+                              >
+                                <ListItemText
+                                  primary={book.title}
+                                  secondary={book.author || "Unknown author"}
+                                  primaryTypographyProps={{ noWrap: true, variant: "body2" }}
+                                  secondaryTypographyProps={{ noWrap: true }}
+                                />
+                                <AddIcon color="primary" fontSize="small" />
+                              </ListItemButton>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" sx={{ p: 2, textAlign: "center", color: "text.secondary" }}>
+                            No results found.
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
+                {/* Wishlist Books */}
+                {stats.wishlistBooks.length > 0 ? (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, maxHeight: 300, overflow: "auto" }}>
+                    {stats.wishlistBooks.map((book) => (
+                      <Box key={book.id} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <BookCoverImage
+                          coverUrl={book.cover_url}
+                          title={book.title}
+                          variant="small"
+                        />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                            {book.title}
+                          </Typography>
+                          {book.author && (
+                            <Typography variant="caption" color="text.secondary" noWrap component="div">
+                              {book.author}
+                            </Typography>
+                          )}
+                        </Box>
+                        {authedEmail === selectedMember?.email && (
+                          <Box sx={{ display: "flex" }}>
+                            <Tooltip title="Edit">
+                              <IconButton size="small" onClick={() => openEditWishlistDialog(book)}>
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Move to library">
+                              <IconButton size="small" color="primary" onClick={() => promptMoveToLibrary(book)}>
+                                <LocalLibraryIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Remove">
+                              <IconButton size="small" color="error" onClick={() => removeFromWishlist(book.id)}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                    No books on wishlist
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Genre Distribution */}
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <LibraryBooksIcon color="secondary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     Genre Distribution
                   </Typography>
-                  
-                  {/* Shared color palette for chart and legend */}
-                  {(() => {
+                </Box>
+
+                {stats.genres.length > 0 ? (
+                  (() => {
                     const genreColors = [
                       "#02b2af", "#2e96ff", "#b800d8", "#60009b", "#2731c8",
                       "#03008d", "#ff6f00", "#4caf50", "#f44336", "#9c27b0"
@@ -722,8 +961,7 @@ export default function ProfilesPage() {
                     
                     return (
                       <>
-                        {/* Pie Chart - centered, no legend */}
-                        <Box sx={{ width: "100%", height: 200, display: "flex", justifyContent: "center" }}>
+                        <Box sx={{ width: "100%", height: 180, display: "flex", justifyContent: "center" }}>
                           <PieChart
                             series={[
                               {
@@ -732,234 +970,209 @@ export default function ProfilesPage() {
                                   value: count,
                                   color: genreColors[index % genreColors.length],
                                 })),
-                                innerRadius: 25,
-                                outerRadius: 80,
+                                innerRadius: 20,
+                                outerRadius: 70,
                                 paddingAngle: 2,
-                                cornerRadius: 5,
+                                cornerRadius: 4,
                               },
                             ]}
-                            width={200}
-                            height={200}
+                            width={180}
+                            height={180}
                           />
                         </Box>
                         
-                        {/* Custom Legend - wraps naturally */}
                         <Box 
                           sx={{ 
                             display: "flex", 
                             flexWrap: "wrap", 
-                            gap: 1,
+                            gap: 0.5,
                             justifyContent: "center",
-                            mt: "24px",
+                            mt: 2,
                           }}
                         >
                           {stats.genres.map(([genre, count], index) => (
-                            <Box 
-                              key={genre} 
-                              sx={{ 
-                                display: "flex", 
-                                alignItems: "center", 
-                                gap: 0.5,
-                                px: 1,
-                                py: 0.5,
+                            <Chip
+                              key={genre}
+                              label={`${genre} (${count})`}
+                              size="small"
+                              sx={{
+                                bgcolor: genreColors[index % genreColors.length],
+                                color: "white",
+                                fontSize: 11,
                               }}
-                            >
-                              <Box 
-                                sx={{ 
-                                  width: 12, 
-                                  height: 12, 
-                                  borderRadius: "50%", 
-                                  backgroundColor: genreColors[index % genreColors.length],
-                                  flexShrink: 0,
-                                }} 
-                              />
-                              <Typography variant="body2" sx={{ fontSize: 12 }}>
-                                {genre} ({count})
-                              </Typography>
-                            </Box>
+                            />
                           ))}
                         </Box>
                       </>
                     );
-                  })()}
-                </Box>
-              )}
-
-              {/* Genre Chips */}
-              {/* Genre Chips removed: legend now shows the count */}
-
-              {stats.genres.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  No genre data available yet. Genres are captured when new books are added.
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Wishlist Section */}
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <MenuBookIcon /> Books I Want to Read
-              </Typography>
-
-              {/* Search - only show if viewing own profile */}
-              {authedEmail === selectedMember?.email && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
-                    Search for a book to add to your list
+                  })()
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                    No genre data available yet
                   </Typography>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    <TextField
-                      placeholder="Search by title or author..."
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      inputRef={wishlistSearchInputRef}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleWishlistSearch();
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="contained"
-                      onClick={handleWishlistSearch}
-                      disabled={wishlistSearchLoading}
-                      sx={{ minWidth: "auto", px: 2 }}
-                    >
-                      {wishlistSearchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
-                    </Button>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Top Ten Favorites */}
+          {stats.topTenBooks.length > 0 && (
+            <Card sx={{ mb: 3 }}>
+              <CardContent sx={{ pt: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <EmojiEventsIcon color="warning" />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Top Ten Favorites
+                    </Typography>
                   </Box>
-
-                  {/* Search Results */}
-                  {showWishlistResults && (
-                    <Box sx={{ mt: 1, maxHeight: 350, overflow: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
-                      {wishlistSearchLoading ? (
-                        <Box sx={{ p: 2, textAlign: "center" }}>
-                          <CircularProgress size={24} />
-                        </Box>
-                      ) : wishlistSearchResults.length > 0 ? (
-                        <>
-                          <List dense disablePadding>
-                            {wishlistSearchResults.map((book, index) => (
-                              <ListItemButton
-                                key={`${book.title}-${book.author}-${index}`}
-                                onClick={() => addToWishlist(book)}
-                                disabled={addingWishlist}
-                              >
-                                {book.coverUrl && (
-                                  <Avatar
-                                    src={book.coverUrl}
-                                    alt={`Cover of ${book.title}`}
-                                    variant="rounded"
-                                    sx={{ width: 28, height: 42, mr: 1.5 }}
-                                  />
-                                )}
-                                <ListItemText
-                                  primary={book.title}
-                                  secondary={book.author || "Unknown author"}
-                                  primaryTypographyProps={{ noWrap: true, variant: "body2" }}
-                                  secondaryTypographyProps={{ noWrap: true }}
-                                />
-                                <AddIcon color="primary" />
-                              </ListItemButton>
-                            ))}
-                          </List>
-                          {hasMoreResults && (
-                            <Box sx={{ p: 1, textAlign: "center", borderTop: "1px solid", borderColor: "divider" }}>
-                              <Button
-                                size="small"
-                                onClick={handleLoadMoreResults}
-                                disabled={loadingMoreResults}
-                                startIcon={loadingMoreResults ? <CircularProgress size={14} /> : null}
-                              >
-                                {loadingMoreResults ? "Loading..." : "Load more results"}
-                              </Button>
-                            </Box>
-                          )}
-                        </>
-                      ) : (
-                        <Typography variant="body2" sx={{ p: 2, textAlign: "center", color: "text.secondary" }}>
-                          No results found.
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
+                  <Link href="/top-tens" passHref style={{ textDecoration: "none" }}>
+                    <Button
+                      variant="text"
+                      endIcon={<ArrowForwardIcon />}
+                      size="small"
+                      sx={{ textTransform: "none" }}
+                    >
+                      <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                        View Top Ten Books
+                      </Box>
+                      <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                        View all
+                      </Box>
+                    </Button>
+                  </Link>
                 </Box>
-              )}
 
-              {/* Wishlist Books */}
-              {stats.wishlistBooks.length > 0 ? (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                  {stats.wishlistBooks.map((book) => (
-                    <Card key={book.id} variant="outlined" sx={{ display: "flex", alignItems: "center", p: 1.5 }}>
-                      <Box sx={{ flexShrink: 0, mr: 2 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 2,
+                    overflowX: "auto",
+                    pb: 1,
+                    pt: 1,
+                    px: 1,
+                    "&::-webkit-scrollbar": { height: 6 },
+                    "&::-webkit-scrollbar-thumb": { bgcolor: "grey.300", borderRadius: 3 },
+                  }}
+                >
+                  {stats.topTenBooks.map((book, index) => (
+                    <Box
+                      key={book.id}
+                      sx={{
+                        flexShrink: 0,
+                        flex: { xs: "0 0 auto", md: "1 1 0" },
+                        textAlign: "center",
+                        minWidth: 80,
+                        maxWidth: 100,
+                      }}
+                    >
+                      <Box sx={{ position: "relative", display: "inline-block", pt: 1, pl: 1 }}>
                         <BookCoverImage
                           coverUrl={book.cover_url}
                           title={book.title}
-                          width={50}
-                          height={75}
+                          width={60}
+                          height={90}
                         />
-                      </Box>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body1" sx={{ fontWeight: 500 }} noWrap>
-                          {book.title}
-                        </Typography>
-                        {book.author && (
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            by {book.author}
-                          </Typography>
-                        )}
-                        {book.genre && (
-                          <Chip label={book.genre} size="small" sx={{ mt: 0.5 }} />
-                        )}
-                      </Box>
-                      {authedEmail === selectedMember?.email && (
-                        <Box sx={{ display: "flex", gap: 0.5 }}>
-                          <Tooltip title="Edit book">
-                            <IconButton
-                              onClick={() => openEditWishlistDialog(book)}
-                              size="small"
-                              aria-label="Edit book"
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Move to library">
-                            <IconButton
-                              onClick={() => promptMoveToLibrary(book)}
-                              size="small"
-                              color="primary"
-                              aria-label="Move to library"
-                            >
-                              <LocalLibraryIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Remove from wishlist">
-                            <IconButton
-                              onClick={() => removeFromWishlist(book.id)}
-                              size="small"
-                              color="error"
-                              aria-label="Remove from wishlist"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            bgcolor: "warning.main",
+                            color: "white",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            boxShadow: 1,
+                          }}
+                        >
+                          {index + 1}
                         </Box>
-                      )}
-                    </Card>
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          mt: 0.5,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {book.title}
+                      </Typography>
+                    </Box>
                   ))}
                 </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No books on the wishlist yet.
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Library Preview */}
+          {stats.libraryBooks.length > 0 && (
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <LibraryBooksIcon color="primary" />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Library
+                    </Typography>
+                  </Box>
+                  <Link href="/libraries" passHref style={{ textDecoration: "none" }}>
+                    <Button
+                      variant="text"
+                      endIcon={<ArrowForwardIcon />}
+                      size="small"
+                      sx={{ textTransform: "none" }}
+                    >
+                      View All ({stats.totalLibraryBooks})
+                    </Button>
+                  </Link>
+                </Box>
+
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 2,
+                    overflowX: "auto",
+                    pb: 1,
+                    "&::-webkit-scrollbar": { height: 6 },
+                    "&::-webkit-scrollbar-thumb": { bgcolor: "grey.300", borderRadius: 3 },
+                  }}
+                >
+                  {stats.libraryBooks.slice(0, 12).map((book) => (
+                    <Box 
+                      key={book.id} 
+                      sx={{ 
+                        flexShrink: 0,
+                        flex: { xs: "0 0 auto", md: "1 1 0" },
+                        display: "flex",
+                        justifyContent: "center",
+                        minWidth: 50,
+                        maxWidth: 70,
+                      }}
+                    >
+                      <BookCoverImage
+                        coverUrl={book.cover_url}
+                        title={book.title}
+                        width={50}
+                        height={75}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Confirmation Dialog for moving to library */}

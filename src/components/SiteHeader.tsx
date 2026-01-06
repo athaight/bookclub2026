@@ -30,7 +30,7 @@ export default function SiteHeader() {
             Reading Challenge
           </Button>
           <Button component={Link} href="/top-tens">
-            Top Tens
+            Top Ten
           </Button>
           <Button component={Link} href="/libraries">
             Libraries

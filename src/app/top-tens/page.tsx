@@ -513,7 +513,7 @@ export default function TopTensPage() {
     // Check if user already has 10 books
     const userBooks = topTenBooks[authedEmail] || [];
     if (userBooks.length >= 10) {
-      alert("You can only have 10 books in your top ten list.");
+      alert("You can only have 10 books in your Top Ten list.");
       return;
     }
 
@@ -842,7 +842,7 @@ export default function TopTensPage() {
       <Box sx={{ textAlign: "center", mt: 4 }}>
         <CircularProgress />
         <Typography variant="h6" sx={{ mt: 2 }}>
-          Loading top ten lists...
+          Loading Top Ten lists...
         </Typography>
       </Box>
     );
@@ -889,7 +889,7 @@ export default function TopTensPage() {
             <IconButton
               onClick={() => setDialogOpen(true)}
               color="primary"
-              aria-label="Add book to top ten"
+              aria-label="Add book to Top Ten"
               disabled={books.length >= 10}
             >
               <AddIcon />
@@ -920,7 +920,7 @@ export default function TopTensPage() {
           ))
         ) : (
           <Typography variant="body2" sx={{ fontStyle: "italic", color: "text.secondary" }}>
-            No books in top ten yet
+            No books in Top Ten yet
           </Typography>
         )}
       </Box>
@@ -941,7 +941,7 @@ export default function TopTensPage() {
               onClick={() => setDialogOpen(true)}
               fullWidth
             >
-              Add book to top ten
+              Add book to Top Ten
             </Button>
           </Box>
         )}
@@ -965,7 +965,7 @@ export default function TopTensPage() {
           ))
         ) : (
           <Typography variant="body2" sx={{ fontStyle: "italic", color: "text.secondary" }}>
-            No books in top ten yet
+            No books in Top Ten yet
           </Typography>
         )}
       </>
@@ -976,7 +976,7 @@ export default function TopTensPage() {
     <>
       <Box sx={{ textAlign: "center", mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          Top Tens
+          Top Ten
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
           The books that made our lists
@@ -1207,7 +1207,7 @@ export default function TopTensPage() {
             variant="outlined"
             value={formComment}
             onChange={(e) => setFormComment(e.target.value)}
-            helperText="Share your thoughts about why this book made your top ten"
+            helperText="Share your thoughts about why this book made your Top Ten"
             sx={{ mb: 2 }}
           />
           <Box sx={{ mb: 1 }}>
