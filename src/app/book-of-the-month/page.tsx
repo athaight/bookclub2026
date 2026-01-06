@@ -29,6 +29,7 @@ import { getMembers } from "@/lib/members";
 import { BookOfTheMonthRow } from "@/types";
 import { searchBooks, getBookDetails, BookSearchResult } from "@/lib/bookSearch";
 import MemberAvatar from "@/components/MemberAvatar";
+import BookCoverImage from "@/components/BookCoverImage";
 import { useProfiles } from "@/lib/useProfiles";
 
 const normEmail = (s: string) => s.trim().toLowerCase();
@@ -279,6 +280,7 @@ export default function BookOfTheMonthPage() {
       // Determine final cover URL
       // Start with the original cover from the book or API
       let finalCoverUrl = selectedBook.coverUrl || null;
+      let coverWasUploaded = false;
 
       // If user selected a new file, upload it
       if (pendingCoverFile) {
@@ -293,6 +295,7 @@ export default function BookOfTheMonthPage() {
 
         const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
         finalCoverUrl = urlData.publicUrl;
+        coverWasUploaded = true;
       } else if (bookOfMonth?.book_cover_url) {
         // Keep existing cover if no new file and we're editing
         finalCoverUrl = bookOfMonth.book_cover_url;
@@ -605,20 +608,19 @@ export default function BookOfTheMonthPage() {
                     <List dense>
                       {searchResults.map((book, idx) => (
                         <ListItemButton key={idx} onClick={() => handleSelectBook(book)}>
-                          {book.coverUrl && (
-                            <Avatar
-                              src={book.coverUrl}
-                              alt={`Cover of ${book.title}`}
-                              variant="rounded"
-                              sx={{ width: 32, height: 48, mr: 1 }}
-                            />
-                          )}
-                          <ListItemText
-                            primary={book.title}
-                            secondary={book.author}
-                            primaryTypographyProps={{ noWrap: true }}
-                            secondaryTypographyProps={{ noWrap: true }}
+                          <BookCoverImage
+                            coverUrl={book.coverUrl}
+                            title={book.title}
+                            variant="small"
                           />
+                          <Box sx={{ ml: 1 }}>
+                            <ListItemText
+                              primary={book.title}
+                              secondary={book.author}
+                              primaryTypographyProps={{ noWrap: true }}
+                              secondaryTypographyProps={{ noWrap: true }}
+                            />
+                          </Box>
                         </ListItemButton>
                       ))}
                       {hasMoreResults && (
@@ -650,30 +652,11 @@ export default function BookOfTheMonthPage() {
                 borderRadius: 1,
               }}>
                 <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-                  {formCoverUrl ? (
-                    <Avatar
-                      src={formCoverUrl}
-                      alt={`Cover of ${selectedBook.title}`}
-                      variant="rounded"
-                      sx={{ width: 60, height: 90 }}
-                    />
-                  ) : (
-                    <Box
-                      sx={{
-                        width: 60,
-                        height: 90,
-                        bgcolor: "action.disabledBackground",
-                        borderRadius: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", px: 0.5 }}>
-                        No cover
-                      </Typography>
-                    </Box>
-                  )}
+                  <BookCoverImage
+                    coverUrl={formCoverUrl}
+                    title={selectedBook.title}
+                    variant="large"
+                  />
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                       {selectedBook.title}

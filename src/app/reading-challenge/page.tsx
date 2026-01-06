@@ -34,6 +34,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import SearchIcon from "@mui/icons-material/Search";
+import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -41,6 +42,7 @@ import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
 import MemberAvatar from "@/components/MemberAvatar";
+import BookCoverImage from "@/components/BookCoverImage";
 
 type Member = { email: string; name: string };
 
@@ -75,14 +77,11 @@ function BookCard({
     <Card sx={{ mb: 1 }}>
       <CardContent sx={{ pb: 1.5 }}>
         <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-          {row.cover_url && (
-            <Avatar
-              src={row.cover_url}
-              alt={`Cover of ${row.title}`}
-              variant="rounded"
-              sx={{ width: 40, height: 60, flexShrink: 0 }}
-            />
-          )}
+          <BookCoverImage
+            coverUrl={row.cover_url}
+            title={row.title || "Book"}
+            variant="default"
+          />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h6" component="h3" noWrap>
               {(row.title ?? "").trim() || "—"}
@@ -156,6 +155,7 @@ export default function HomePage() {
   const [markCompleted, setMarkCompleted] = useState(false);
   const [draftRating, setDraftRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
 
   // Book search state
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -300,6 +300,7 @@ export default function HomePage() {
     setDraftRating(null);
     setEditingCurrent(false);
     setEditingBookId(null);
+    setPendingCoverFile(null);
     if (searchInputRef.current) searchInputRef.current.value = "";
     setSearchResults([]);
     setShowResults(false);
@@ -314,6 +315,7 @@ export default function HomePage() {
     setDraftRating(null);
     setEditingCurrent(true);
     setEditingBookId(current.id);
+    setPendingCoverFile(null);
     if (searchInputRef.current) searchInputRef.current.value = "";
     setSearchResults([]);
     setShowResults(false);
@@ -369,9 +371,22 @@ export default function HomePage() {
     setDraftAuthor(book.author);
     setDraftCoverUrl(book.coverUrl || null);
     setDraftGenre(book.genre || null);
+    setPendingCoverFile(null);
     setSearchResults([]);
     setShowResults(false);
     if (searchInputRef.current) searchInputRef.current.value = "";
+  }
+
+  // Handle cover file selection in the editor
+  function handleCoverFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!event.target.files || event.target.files.length === 0) return;
+    
+    const file = event.target.files[0];
+    setPendingCoverFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setDraftCoverUrl(previewUrl);
   }
 
   async function saveCurrent(memberEmail: string) {
@@ -396,6 +411,26 @@ export default function HomePage() {
     const challengeYear = 2026;
 
     try {
+      // Handle cover upload if a new file was selected
+      let finalCoverUrl = draftCoverUrl;
+      let coverWasUploaded = false;
+      if (pendingCoverFile) {
+        const fileExt = pendingCoverFile.name.split(".").pop();
+        const fileName = `cover_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("book-covers")
+          .upload(fileName, pendingCoverFile, { upsert: true });
+
+        if (uploadError) {
+          throw new Error(`Cover upload failed: ${uploadError.message}`);
+        }
+
+        const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
+        finalCoverUrl = urlData.publicUrl;
+        coverWasUploaded = true;
+      }
+
       if (!editingBookId) {
         // Adding a new book - check limit first
         if (!markCompleted && currentBooks.length >= MAX_CURRENT_BOOKS) {
@@ -413,7 +448,7 @@ export default function HomePage() {
           title,
           author: author || "",
           comment: comment || "",
-          cover_url: draftCoverUrl || null,
+          cover_url: finalCoverUrl || null,
           genre: draftGenre || null,
           completed_at: markCompleted ? new Date().toISOString() : null,
           rating: markCompleted ? draftRating : null,
@@ -421,6 +456,7 @@ export default function HomePage() {
           in_library: markCompleted ? true : false,
         });
         if (error) throw new Error(error.message);
+
         await refresh();
         resetEditorToBlank();
         return;
@@ -433,7 +469,7 @@ export default function HomePage() {
           title,
           author: author || "",
           comment: comment || "",
-          cover_url: draftCoverUrl || null,
+          cover_url: finalCoverUrl || null,
         })
         .eq("id", editingBookId);
 
@@ -542,20 +578,19 @@ export default function HomePage() {
                             key={`${book.title}-${book.author}-${index}`}
                             onClick={() => handleSelectBook(book)}
                           >
-                            {book.coverUrl && (
-                              <Avatar
-                                src={book.coverUrl}
-                                alt={`Cover of ${book.title}`}
-                                variant="rounded"
-                                sx={{ width: 28, height: 42, mr: 1.5 }}
-                              />
-                            )}
-                            <ListItemText
-                              primary={book.title}
-                              secondary={book.author || 'Unknown author'}
-                              primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
-                              secondaryTypographyProps={{ noWrap: true }}
+                            <BookCoverImage
+                              coverUrl={book.coverUrl}
+                              title={book.title}
+                              variant="small"
                             />
+                            <Box sx={{ ml: 1.5 }}>
+                              <ListItemText
+                                primary={book.title}
+                                secondary={book.author || 'Unknown author'}
+                                primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
+                                secondaryTypographyProps={{ noWrap: true }}
+                              />
+                            </Box>
                           </ListItemButton>
                         ))}
                       </List>
@@ -581,21 +616,47 @@ export default function HomePage() {
               )}
             </Box>
 
-            {/* Selected Book Preview */}
-            {draftCoverUrl && (
-              <Box sx={{ display: 'flex', alignItems: 'center', p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Avatar
-                  src={draftCoverUrl}
-                  alt={`Cover of ${draftTitle}`}
-                  variant="rounded"
-                  sx={{ width: 40, height: 60, mr: 1.5 }}
-                />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 'medium' }}>{draftTitle}</Typography>
-                  <Typography variant="caption" noWrap color="text.secondary">{draftAuthor}</Typography>
+            {/* Selected Book Preview with Cover Upload */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <BookCoverImage
+                coverUrl={draftCoverUrl}
+                title={draftTitle || "Book"}
+                variant="default"
+              />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                {draftTitle && (
+                  <>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 'medium' }}>{draftTitle}</Typography>
+                    <Typography variant="caption" noWrap color="text.secondary">{draftAuthor}</Typography>
+                  </>
+                )}
+                {/* Cover Upload Button */}
+                <Box sx={{ mt: 1 }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverFileSelect}
+                    style={{ display: "none" }}
+                    id="reading-challenge-cover-upload"
+                  />
+                  <label htmlFor="reading-challenge-cover-upload">
+                    <Button
+                      component="span"
+                      variant="outlined"
+                      size="small"
+                      startIcon={<AddPhotoAlternateIcon />}
+                    >
+                      {draftCoverUrl ? "Change Cover" : "Add Cover"}
+                    </Button>
+                  </label>
+                  {pendingCoverFile && (
+                    <Typography variant="caption" color="success.main" sx={{ ml: 1 }}>
+                      New image selected
+                    </Typography>
+                  )}
                 </Box>
               </Box>
-            )}
+            </Box>
 
             <TextField
               label="Title"
@@ -665,14 +726,11 @@ export default function HomePage() {
             <Card key={current.id} sx={{ minHeight: 100 }}>
               <CardContent sx={{ display: "flex", flexDirection: "column", py: 1.5, "&:last-child": { pb: 1.5 } }}>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flex: 1 }}>
-                  {current.cover_url && (
-                    <Avatar
-                      src={current.cover_url}
-                      alt={`Cover of ${current.title}`}
-                      variant="rounded"
-                      sx={{ width: 40, height: 60, flexShrink: 0 }}
-                    />
-                  )}
+                  <BookCoverImage
+                    coverUrl={current.cover_url}
+                    title={current.title || "Book"}
+                    variant="default"
+                  />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="subtitle1" component="h3" noWrap sx={{ fontWeight: 600 }}>
                       {(current.title ?? "").trim() || "—"}

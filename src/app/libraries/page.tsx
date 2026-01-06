@@ -34,6 +34,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -41,6 +42,7 @@ import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
 import MemberAvatar from "@/components/MemberAvatar";
+import BookCoverImage from "@/components/BookCoverImage";
 
 type Member = { email: string; name: string };
 
@@ -65,14 +67,11 @@ function LibraryBookCard({
     <Card sx={{ mb: 1 }}>
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
         <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-          {row.cover_url && (
-            <Avatar
-              src={row.cover_url}
-              alt={`Cover of ${row.title}`}
-              variant="rounded"
-              sx={{ width: 40, height: 60, flexShrink: 0, mt: 0.5 }}
-            />
-          )}
+          <BookCoverImage
+            coverUrl={row.cover_url}
+            title={row.title || "Book"}
+            variant="default"
+          />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="body1" component="h3" sx={{ fontWeight: 500 }}>
               {(row.title ?? "").trim() || "—"}
@@ -162,6 +161,7 @@ export default function OurLibrariesPage() {
   const [formComment, setFormComment] = useState("");
   const [formTopTen, setFormTopTen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
 
   // Top Ten conflict dialogs
   const [topTenFullDialogOpen, setTopTenFullDialogOpen] = useState(false);
@@ -410,9 +410,22 @@ export default function OurLibrariesPage() {
     setFormAuthor(book.author);
     setFormCoverUrl(book.coverUrl || null);
     setFormGenre(book.genre || null);
+    setPendingCoverFile(null);
     setSearchResults([]);
     setShowResults(false);
     if (searchInputRef.current) searchInputRef.current.value = "";
+  }
+
+  // Handle cover file selection in the dialog
+  function handleCoverFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!event.target.files || event.target.files.length === 0) return;
+    
+    const file = event.target.files[0];
+    setPendingCoverFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setFormCoverUrl(previewUrl);
   }
 
   function handleDialogClose() {
@@ -425,6 +438,7 @@ export default function OurLibrariesPage() {
     setFormRating(null);
     setFormComment("");
     setFormTopTen(false);
+    setPendingCoverFile(null);
     if (searchInputRef.current) searchInputRef.current.value = "";
     setSearchResults([]);
     setShowResults(false);
@@ -438,6 +452,7 @@ export default function OurLibrariesPage() {
     setFormRating(book.rating || null);
     setFormTopTen(book.top_ten || false);
     setFormComment(book.comment || "");
+    setPendingCoverFile(null);
     setDialogOpen(true);
   }
 
@@ -486,6 +501,26 @@ export default function OurLibrariesPage() {
     setSaving(true);
 
     try {
+      // Handle cover upload if a new file was selected
+      let finalCoverUrl = formCoverUrl;
+      let coverWasUploaded = false;
+      if (pendingCoverFile) {
+        const fileExt = pendingCoverFile.name.split(".").pop();
+        const fileName = `cover_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("book-covers")
+          .upload(fileName, pendingCoverFile, { upsert: true });
+
+        if (uploadError) {
+          throw new Error(`Cover upload failed: ${uploadError.message}`);
+        }
+
+        const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
+        finalCoverUrl = urlData.publicUrl;
+        coverWasUploaded = true;
+      }
+
       if (editingBook) {
         // Update existing book
         const { error } = await supabase
@@ -493,7 +528,7 @@ export default function OurLibrariesPage() {
           .update({
             title,
             author: author || "",
-            cover_url: formCoverUrl || null,
+            cover_url: finalCoverUrl || null,
             rating: formRating,
             comment: comment || "",
             top_ten: formTopTen,
@@ -522,7 +557,7 @@ export default function OurLibrariesPage() {
           status: "completed",
           title,
           author: author || "",
-          cover_url: formCoverUrl || null,
+          cover_url: finalCoverUrl || null,
           genre: formGenre || null,
           in_library: true,
           top_ten: formTopTen,
@@ -848,20 +883,19 @@ export default function OurLibrariesPage() {
                           key={`${book.title}-${book.author}-${index}`}
                           onClick={() => handleSelectBook(book)}
                         >
-                          {book.coverUrl && (
-                            <Avatar
-                              src={book.coverUrl}
-                              alt={`Cover of ${book.title}`}
-                              variant="rounded"
-                              sx={{ width: 32, height: 48, mr: 1.5 }}
-                            />
-                          )}
-                          <ListItemText
-                            primary={book.title}
-                            secondary={book.author || "Unknown author"}
-                            primaryTypographyProps={{ noWrap: true }}
-                            secondaryTypographyProps={{ noWrap: true }}
+                          <BookCoverImage
+                            coverUrl={book.coverUrl}
+                            title={book.title}
+                            variant="small"
                           />
+                          <Box sx={{ ml: 1.5 }}>
+                            <ListItemText
+                              primary={book.title}
+                              secondary={book.author || "Unknown author"}
+                              primaryTypographyProps={{ noWrap: true }}
+                              secondaryTypographyProps={{ noWrap: true }}
+                            />
+                          </Box>
                         </ListItemButton>
                       ))}
                     </List>
@@ -892,34 +926,60 @@ export default function OurLibrariesPage() {
 
           <Divider sx={{ my: 2 }} />
 
-          {/* Selected Book Preview */}
-          {formCoverUrl && (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                mb: 2,
-                p: 1,
-                bgcolor: "action.hover",
-                borderRadius: 1,
-              }}
-            >
-              <Avatar
-                src={formCoverUrl}
-                alt={`Cover of ${formTitle}`}
-                variant="rounded"
-                sx={{ width: 48, height: 72, mr: 2 }}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: "medium" }}>
-                  {formTitle}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {formAuthor}
-                </Typography>
+          {/* Selected Book Preview with Cover Upload */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-start",
+              mb: 2,
+              p: 1,
+              bgcolor: "action.hover",
+              borderRadius: 1,
+            }}
+          >
+            <BookCoverImage
+              coverUrl={formCoverUrl}
+              title={formTitle || "Book"}
+              variant="large"
+            />
+            <Box sx={{ ml: 2, flex: 1 }}>
+              {formTitle && (
+                <>
+                  <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                    {formTitle}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formAuthor}
+                  </Typography>
+                </>
+              )}
+              {/* Cover Upload Button */}
+              <Box sx={{ mt: 1 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverFileSelect}
+                  style={{ display: "none" }}
+                  id="library-cover-upload"
+                />
+                <label htmlFor="library-cover-upload">
+                  <Button
+                    component="span"
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddPhotoAlternateIcon />}
+                  >
+                    {formCoverUrl ? "Change Cover" : "Add Cover"}
+                  </Button>
+                </label>
+                {pendingCoverFile && (
+                  <Typography variant="caption" color="success.main" sx={{ ml: 1 }}>
+                    New image selected
+                  </Typography>
+                )}
               </Box>
             </Box>
-          )}
+          </Box>
 
           <TextField
             margin="dense"
