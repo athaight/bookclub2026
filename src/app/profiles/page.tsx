@@ -33,12 +33,14 @@ import LocalLibraryIcon from "@mui/icons-material/LocalLibrary";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
 import Tooltip from "@mui/material/Tooltip";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
 import { supabase } from "@/lib/supabaseClient";
 import { BookRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
+import BookCoverImage from "@/components/BookCoverImage";
 
 type Member = { email: string; name: string };
 
@@ -73,6 +75,15 @@ export default function ProfilesPage() {
   const [loadingMoreResults, setLoadingMoreResults] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState("");
+
+  // Wishlist edit dialog state
+  const [editWishlistDialogOpen, setEditWishlistDialogOpen] = useState(false);
+  const [editingWishlistBook, setEditingWishlistBook] = useState<BookRow | null>(null);
+  const [editWishlistTitle, setEditWishlistTitle] = useState("");
+  const [editWishlistAuthor, setEditWishlistAuthor] = useState("");
+  const [editWishlistCoverUrl, setEditWishlistCoverUrl] = useState<string | null>(null);
+  const [pendingWishlistCoverFile, setPendingWishlistCoverFile] = useState<File | null>(null);
+  const [savingWishlistEdit, setSavingWishlistEdit] = useState(false);
 
   // Library confirmation modal state
   const [libraryConfirmOpen, setLibraryConfirmOpen] = useState(false);
@@ -309,6 +320,86 @@ export default function ProfilesPage() {
       }
     } catch (error) {
       console.error("Error removing from wishlist:", error);
+    }
+  }
+
+  // Open edit dialog for wishlist book
+  function openEditWishlistDialog(book: BookRow) {
+    setEditingWishlistBook(book);
+    setEditWishlistTitle(book.title);
+    setEditWishlistAuthor(book.author || "");
+    setEditWishlistCoverUrl(book.cover_url || null);
+    setPendingWishlistCoverFile(null);
+    setEditWishlistDialogOpen(true);
+  }
+
+  // Close edit dialog
+  function closeEditWishlistDialog() {
+    setEditWishlistDialogOpen(false);
+    setEditingWishlistBook(null);
+    setEditWishlistTitle("");
+    setEditWishlistAuthor("");
+    setEditWishlistCoverUrl(null);
+    setPendingWishlistCoverFile(null);
+  }
+
+  // Save wishlist book edits
+  async function saveWishlistBookEdit() {
+    if (!editingWishlistBook || !selectedMember || authedEmail !== selectedMember.email) return;
+
+    setSavingWishlistEdit(true);
+    try {
+      let finalCoverUrl = editWishlistCoverUrl;
+
+      // If a new cover file was selected, upload it
+      if (pendingWishlistCoverFile) {
+        const fileExt = pendingWishlistCoverFile.name.split(".").pop();
+        const fileName = `cover_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("book-covers")
+          .upload(fileName, pendingWishlistCoverFile, { upsert: true });
+
+        if (uploadError) throw new Error(`Cover upload failed: ${uploadError.message}`);
+
+        const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
+        finalCoverUrl = urlData.publicUrl;
+      }
+
+      // Update the book
+      const { error } = await supabase
+        .from("books")
+        .update({
+          title: editWishlistTitle.trim(),
+          author: editWishlistAuthor.trim() || null,
+          cover_url: finalCoverUrl,
+        })
+        .eq("id", editingWishlistBook.id);
+
+      if (error) throw error;
+
+      // Refresh books
+      const { data } = await supabase
+        .from("books")
+        .select("*")
+        .in("member_email", members.map((m) => m.email));
+
+      if (data) {
+        const grouped: Record<string, BookRow[]> = {};
+        for (const m of members) {
+          grouped[m.email] = data.filter((b) => b.member_email === m.email);
+        }
+        setMemberBooks(grouped);
+      }
+
+      closeEditWishlistDialog();
+    } catch (error) {
+      console.error("Error saving wishlist book:", error);
+      setSnackbarMessage("Failed to save changes");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    } finally {
+      setSavingWishlistEdit(false);
     }
   }
 
@@ -804,14 +895,14 @@ export default function ProfilesPage() {
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                   {stats.wishlistBooks.map((book) => (
                     <Card key={book.id} variant="outlined" sx={{ display: "flex", alignItems: "center", p: 1.5 }}>
-                      {book.cover_url && (
-                        <Avatar
-                          src={book.cover_url}
-                          alt={`Cover of ${book.title}`}
-                          variant="rounded"
-                          sx={{ width: 50, height: 75, flexShrink: 0, mr: 2 }}
+                      <Box sx={{ flexShrink: 0, mr: 2 }}>
+                        <BookCoverImage
+                          coverUrl={book.cover_url}
+                          title={book.title}
+                          width={50}
+                          height={75}
                         />
-                      )}
+                      </Box>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body1" sx={{ fontWeight: 500 }} noWrap>
                           {book.title}
@@ -827,6 +918,15 @@ export default function ProfilesPage() {
                       </Box>
                       {authedEmail === selectedMember?.email && (
                         <Box sx={{ display: "flex", gap: 0.5 }}>
+                          <Tooltip title="Edit book">
+                            <IconButton
+                              onClick={() => openEditWishlistDialog(book)}
+                              size="small"
+                              aria-label="Edit book"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Move to library">
                             <IconButton
                               onClick={() => promptMoveToLibrary(book)}
@@ -898,6 +998,63 @@ export default function ProfilesPage() {
           Loading stats...
         </Typography>
       )}
+
+      {/* Edit Wishlist Book Dialog */}
+      <Dialog
+        open={editWishlistDialogOpen}
+        onClose={closeEditWishlistDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Wishlist Book</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+            {/* Cover Image with upload */}
+            <Box sx={{ display: "flex", justifyContent: "center" }}>
+              <BookCoverImage
+                coverUrl={editWishlistCoverUrl}
+                title={editWishlistTitle}
+                width={100}
+                height={150}
+                editable
+                pendingFile={pendingWishlistCoverFile}
+                onFileSelect={(file, previewUrl) => {
+                  setPendingWishlistCoverFile(file);
+                  setEditWishlistCoverUrl(previewUrl);
+                }}
+              />
+            </Box>
+
+            <TextField
+              label="Title"
+              value={editWishlistTitle}
+              onChange={(e) => setEditWishlistTitle(e.target.value)}
+              fullWidth
+              required
+            />
+
+            <TextField
+              label="Author"
+              value={editWishlistAuthor}
+              onChange={(e) => setEditWishlistAuthor(e.target.value)}
+              fullWidth
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEditWishlistDialog} disabled={savingWishlistEdit}>
+            Cancel
+          </Button>
+          <Button
+            onClick={saveWishlistBookEdit}
+            variant="contained"
+            disabled={savingWishlistEdit || !editWishlistTitle.trim()}
+            startIcon={savingWishlistEdit ? <CircularProgress size={16} /> : null}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Notification Snackbar */}
       <Snackbar
