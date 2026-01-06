@@ -80,6 +80,8 @@ function BookCard({
           <BookCoverImage
             coverUrl={row.cover_url}
             title={row.title || "Book"}
+            author={row.author}
+            genre={row.genre}
             variant="default"
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -582,6 +584,7 @@ export default function HomePage() {
                               coverUrl={book.coverUrl}
                               title={book.title}
                               variant="small"
+                              disableModal
                             />
                             <Box sx={{ ml: 1.5 }}>
                               <ListItemText
@@ -622,6 +625,7 @@ export default function HomePage() {
                 coverUrl={draftCoverUrl}
                 title={draftTitle || "Book"}
                 variant="default"
+                disableModal
               />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 {draftTitle && (
@@ -729,6 +733,8 @@ export default function HomePage() {
                   <BookCoverImage
                     coverUrl={current.cover_url}
                     title={current.title || "Book"}
+                    author={current.author}
+                    genre={current.genre}
                     variant="default"
                   />
                   <Box sx={{ flex: 1, minWidth: 0 }}>

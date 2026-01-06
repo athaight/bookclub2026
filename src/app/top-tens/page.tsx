@@ -120,6 +120,8 @@ function TopTenBookCard({
           <BookCoverImage
             coverUrl={row.cover_url}
             title={row.title || "Book"}
+            author={row.author}
+            genre={row.genre}
             variant="default"
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1102,6 +1104,7 @@ export default function TopTensPage() {
                             coverUrl={book.coverUrl}
                             title={book.title}
                             variant="small"
+                            disableModal
                           />
                           <Box sx={{ ml: 1.5 }}>
                             <ListItemText
@@ -1144,6 +1147,7 @@ export default function TopTensPage() {
               coverUrl={formCoverUrl}
               title={formTitle || "Book"}
               variant="large"
+              disableModal
             />
             <Box sx={{ ml: 2, flex: 1 }}>
               {formTitle && (
@@ -1267,6 +1271,7 @@ export default function TopTensPage() {
                 width={100}
                 height={150}
                 editable
+                disableModal
                 pendingFile={pendingEditCoverFile}
                 onFileSelect={(file, previewUrl) => {
                   setPendingEditCoverFile(file);

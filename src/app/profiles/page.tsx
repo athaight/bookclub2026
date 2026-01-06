@@ -774,6 +774,8 @@ export default function ProfilesPage() {
                         <BookCoverImage
                           coverUrl={book.cover_url}
                           title={book.title}
+                          author={book.author}
+                          genre={book.genre}
                           width={50}
                           height={75}
                         />
@@ -900,6 +902,8 @@ export default function ProfilesPage() {
                         <BookCoverImage
                           coverUrl={book.cover_url}
                           title={book.title}
+                          author={book.author}
+                          genre={book.genre}
                           variant="small"
                         />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1071,6 +1075,8 @@ export default function ProfilesPage() {
                         <BookCoverImage
                           coverUrl={book.cover_url}
                           title={book.title}
+                          author={book.author}
+                          genre={book.genre}
                           width={60}
                           height={90}
                         />
@@ -1163,6 +1169,8 @@ export default function ProfilesPage() {
                       <BookCoverImage
                         coverUrl={book.cover_url}
                         title={book.title}
+                        author={book.author}
+                        genre={book.genre}
                         width={50}
                         height={75}
                       />
@@ -1230,6 +1238,7 @@ export default function ProfilesPage() {
                 width={100}
                 height={150}
                 editable
+                disableModal
                 pendingFile={pendingWishlistCoverFile}
                 onFileSelect={(file, previewUrl) => {
                   setPendingWishlistCoverFile(file);

@@ -70,6 +70,8 @@ function LibraryBookCard({
           <BookCoverImage
             coverUrl={row.cover_url}
             title={row.title || "Book"}
+            author={row.author}
+            genre={row.genre}
             variant="default"
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -887,6 +889,7 @@ export default function OurLibrariesPage() {
                             coverUrl={book.coverUrl}
                             title={book.title}
                             variant="small"
+                            disableModal
                           />
                           <Box sx={{ ml: 1.5 }}>
                             <ListItemText
@@ -941,6 +944,7 @@ export default function OurLibrariesPage() {
               coverUrl={formCoverUrl}
               title={formTitle || "Book"}
               variant="large"
+              disableModal
             />
             <Box sx={{ ml: 2, flex: 1 }}>
               {formTitle && (

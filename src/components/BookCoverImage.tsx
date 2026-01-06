@@ -5,6 +5,7 @@ import { Avatar, Box, IconButton, CircularProgress, Typography } from "@mui/mate
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { supabase } from "@/lib/supabaseClient";
+import BookDetailsModal from "./BookDetailsModal";
 
 interface BookCoverImageProps {
   coverUrl?: string | null;
@@ -21,6 +22,16 @@ interface BookCoverImageProps {
   onFileSelect?: (file: File, previewUrl: string) => void;
   /** Show as small inline version (for search results, etc) */
   variant?: "default" | "small" | "large";
+  /** Book author for the details modal */
+  author?: string | null;
+  /** Book genre for the details modal */
+  genre?: string | null;
+  /** Book summary (if already available) */
+  summary?: string | null;
+  /** Open Library key for fetching details */
+  bookKey?: string | null;
+  /** Disable click to open details modal */
+  disableModal?: boolean;
 }
 
 export default function BookCoverImage({
@@ -33,9 +44,15 @@ export default function BookCoverImage({
   pendingFile,
   onFileSelect,
   variant = "default",
+  author,
+  genre,
+  summary,
+  bookKey,
+  disableModal = false,
 }: BookCoverImageProps) {
   const [uploading, setUploading] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Determine dimensions based on variant
@@ -98,49 +115,151 @@ export default function BookCoverImage({
     }
   };
 
-  const handleUploadClick = () => {
+  const handleUploadClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening modal when clicking upload
     fileInputRef.current?.click();
   };
+
+  const handleCoverClick = () => {
+    if (!disableModal) {
+      setModalOpen(true);
+    }
+  };
+
+  const isClickable = !disableModal;
 
   // Render placeholder when no cover
   if (!displayUrl) {
     return (
-      <Box sx={{ position: "relative", display: "inline-flex" }}>
-        <Box
+      <>
+        <Box 
+          sx={{ position: "relative", display: "inline-flex" }}
+          onClick={handleCoverClick}
+          role={isClickable ? "button" : undefined}
+          tabIndex={isClickable ? 0 : undefined}
+          onKeyDown={isClickable ? (e) => e.key === "Enter" && handleCoverClick() : undefined}
+          aria-label={isClickable ? `View details for ${title}` : undefined}
+        >
+          <Box
+            sx={{
+              width: imgWidth,
+              height: imgHeight,
+              bgcolor: "grey.300",
+              borderRadius: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              cursor: isClickable ? "pointer" : "default",
+              transition: "transform 0.15s ease, box-shadow 0.15s ease",
+              "&:hover": isClickable ? {
+                transform: "scale(1.05)",
+                boxShadow: 2,
+              } : {},
+            }}
+          >
+            <MenuBookIcon
+              sx={{
+                color: "grey.500",
+                fontSize: variant === "small" ? 16 : variant === "large" ? 28 : 20,
+              }}
+            />
+            {variant !== "small" && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "grey.500",
+                  fontSize: variant === "large" ? 9 : 7,
+                  mt: 0.25,
+                  textAlign: "center",
+                  px: 0.25,
+                  lineHeight: 1.1,
+                }}
+              >
+                No cover
+              </Typography>
+            )}
+          </Box>
+
+          {editable && (
+            <>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                style={{ display: "none" }}
+                ref={fileInputRef}
+              />
+              <IconButton
+              size="small"
+              onClick={handleUploadClick}
+              disabled={uploading}
+              sx={{
+                position: "absolute",
+                bottom: -4,
+                right: -4,
+                bgcolor: "background.paper",
+                boxShadow: 1,
+                width: 20,
+                height: 20,
+                "&:hover": { bgcolor: "grey.100" },
+              }}
+            >
+              {uploading ? (
+                <CircularProgress size={12} />
+              ) : (
+                <AddPhotoAlternateIcon sx={{ fontSize: 12 }} />
+              )}
+            </IconButton>
+          </>
+        )}
+      </Box>
+
+        <BookDetailsModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          book={{
+            title,
+            author,
+            coverUrl,
+            genre,
+            summary,
+            key: bookKey,
+          }}
+        />
+      </>
+    );
+  }
+
+  // Render cover image
+  return (
+    <>
+      <Box 
+        sx={{ position: "relative", display: "inline-flex" }}
+        onClick={handleCoverClick}
+        role={isClickable ? "button" : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        onKeyDown={isClickable ? (e) => e.key === "Enter" && handleCoverClick() : undefined}
+        aria-label={isClickable ? `View details for ${title}` : undefined}
+      >
+        <Avatar
+          src={displayUrl}
+          alt={`Cover of ${title}`}
+          variant="rounded"
           sx={{
             width: imgWidth,
             height: imgHeight,
-            bgcolor: "grey.300",
-            borderRadius: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
             flexShrink: 0,
+            cursor: isClickable ? "pointer" : "default",
+            transition: "transform 0.15s ease, box-shadow 0.15s ease",
+            "&:hover": isClickable ? {
+              transform: "scale(1.05)",
+              boxShadow: 3,
+            } : {},
+            "& img": { objectFit: "cover" },
           }}
-        >
-          <MenuBookIcon
-            sx={{
-              color: "grey.500",
-              fontSize: variant === "small" ? 16 : variant === "large" ? 28 : 20,
-            }}
-          />
-          {variant !== "small" && (
-            <Typography
-              variant="caption"
-              sx={{
-                color: "grey.500",
-                fontSize: variant === "large" ? 9 : 7,
-                mt: 0.25,
-                textAlign: "center",
-                px: 0.25,
-                lineHeight: 1.1,
-              }}
-            >
-              No cover
-            </Typography>
-          )}
-        </Box>
+        />
 
         {editable && (
           <>
@@ -175,56 +294,19 @@ export default function BookCoverImage({
           </>
         )}
       </Box>
-    );
-  }
 
-  // Render cover image
-  return (
-    <Box sx={{ position: "relative", display: "inline-flex" }}>
-      <Avatar
-        src={displayUrl}
-        alt={`Cover of ${title}`}
-        variant="rounded"
-        sx={{
-          width: imgWidth,
-          height: imgHeight,
-          flexShrink: 0,
-          "& img": { objectFit: "cover" },
+      <BookDetailsModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        book={{
+          title,
+          author,
+          coverUrl,
+          genre,
+          summary,
+          key: bookKey,
         }}
       />
-
-      {editable && (
-        <>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            style={{ display: "none" }}
-            ref={fileInputRef}
-          />
-          <IconButton
-            size="small"
-            onClick={handleUploadClick}
-            disabled={uploading}
-            sx={{
-              position: "absolute",
-              bottom: -4,
-              right: -4,
-              bgcolor: "background.paper",
-              boxShadow: 1,
-              width: 20,
-              height: 20,
-              "&:hover": { bgcolor: "grey.100" },
-            }}
-          >
-            {uploading ? (
-              <CircularProgress size={12} />
-            ) : (
-              <AddPhotoAlternateIcon sx={{ fontSize: 12 }} />
-            )}
-          </IconButton>
-        </>
-      )}
-    </Box>
+    </>
   );
 }

@@ -612,6 +612,7 @@ export default function BookOfTheMonthPage() {
                             coverUrl={book.coverUrl}
                             title={book.title}
                             variant="small"
+                            disableModal
                           />
                           <Box sx={{ ml: 1 }}>
                             <ListItemText
@@ -656,6 +657,7 @@ export default function BookOfTheMonthPage() {
                     coverUrl={formCoverUrl}
                     title={selectedBook.title}
                     variant="large"
+                    disableModal
                   />
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
