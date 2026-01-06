@@ -31,6 +31,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import SearchIcon from "@mui/icons-material/Search";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import EditIcon from "@mui/icons-material/Edit";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -49,6 +50,7 @@ function TopTenBookCard({
   index,
   isOwner,
   onDelete,
+  onEdit,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -60,6 +62,7 @@ function TopTenBookCard({
   index: number;
   isOwner?: boolean;
   onDelete?: (row: BookRow) => void;
+  onEdit?: (row: BookRow) => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -139,15 +142,28 @@ function TopTenBookCard({
             )}
           </Box>
 
-          {isOwner && onDelete && (
-            <IconButton
-              aria-label="delete"
-              onClick={() => onDelete(row)}
-              size="small"
-              sx={{ color: "error.main" }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+          {isOwner && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {onEdit && (
+                <IconButton
+                  aria-label="edit"
+                  onClick={() => onEdit(row)}
+                  size="small"
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              )}
+              {onDelete && (
+                <IconButton
+                  aria-label="delete"
+                  onClick={() => onDelete(row)}
+                  size="small"
+                  sx={{ color: "error.main" }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              )}
+            </Box>
           )}
         </Box>
       </CardContent>
@@ -201,6 +217,17 @@ export default function TopTensPage() {
   // Duplicate detection dialog state
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [duplicateLibraryBook, setDuplicateLibraryBook] = useState<BookRow | null>(null);
+
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<BookRow | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
+  const [editComment, setEditComment] = useState("");
+  const [editCoverUrl, setEditCoverUrl] = useState<string | null>(null);
+  const [editRating, setEditRating] = useState<number | null>(null);
+  const [pendingEditCoverFile, setPendingEditCoverFile] = useState<File | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -384,6 +411,86 @@ export default function TopTensPage() {
     setFormGenre(null);
     setFormRating(null);
     setPendingCoverFile(null);
+  };
+
+  // Edit dialog handlers
+  const openEditDialog = (book: BookRow) => {
+    setEditingBook(book);
+    setEditTitle(book.title);
+    setEditAuthor(book.author || "");
+    setEditComment(book.comment || "");
+    setEditCoverUrl(book.cover_url || null);
+    setEditRating(book.rating || null);
+    setPendingEditCoverFile(null);
+    setEditDialogOpen(true);
+  };
+
+  const closeEditDialog = () => {
+    setEditDialogOpen(false);
+    setEditingBook(null);
+    setEditTitle("");
+    setEditAuthor("");
+    setEditComment("");
+    setEditCoverUrl(null);
+    setEditRating(null);
+    setPendingEditCoverFile(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingBook || !authedEmail) return;
+
+    const title = editTitle.trim();
+    if (!title) {
+      alert("Title is required.");
+      return;
+    }
+
+    if (!editRating) {
+      alert("Rating is required for Top Ten books.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      let finalCoverUrl = editCoverUrl;
+
+      // If a new cover file was selected, upload it
+      if (pendingEditCoverFile) {
+        const fileExt = pendingEditCoverFile.name.split(".").pop();
+        const fileName = `cover_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("book-covers")
+          .upload(fileName, pendingEditCoverFile, { upsert: true });
+
+        if (uploadError) throw new Error(`Cover upload failed: ${uploadError.message}`);
+
+        const { data: urlData } = supabase.storage.from("book-covers").getPublicUrl(fileName);
+        finalCoverUrl = urlData.publicUrl;
+      }
+
+      // Update the book
+      const { error } = await supabase
+        .from("books")
+        .update({
+          title,
+          author: editAuthor.trim() || null,
+          comment: editComment.trim() || null,
+          cover_url: finalCoverUrl,
+          rating: editRating,
+        })
+        .eq("id", editingBook.id);
+
+      if (error) throw error;
+
+      await refreshTopTenBooks();
+      closeEditDialog();
+    } catch (error) {
+      console.error("Error saving book:", error);
+      alert(`Error saving book: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleAddBook = async () => {
@@ -802,6 +909,7 @@ export default function TopTensPage() {
               index={index}
               isOwner={isOwner}
               onDelete={handleDeleteClick}
+              onEdit={openEditDialog}
               onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
@@ -846,6 +954,7 @@ export default function TopTensPage() {
               index={index}
               isOwner={isOwner}
               onDelete={handleDeleteClick}
+              onEdit={openEditDialog}
               onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
@@ -1141,6 +1250,77 @@ export default function TopTensPage() {
           </Button>
           <Button onClick={handleDuplicateReplace} variant="contained" disabled={saving}>
             Replace
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Book Dialog */}
+      <Dialog open={editDialogOpen} onClose={closeEditDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Top Ten Book</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+            {/* Cover Image with upload */}
+            <Box sx={{ display: "flex", justifyContent: "center" }}>
+              <BookCoverImage
+                coverUrl={editCoverUrl}
+                title={editTitle}
+                width={100}
+                height={150}
+                editable
+                pendingFile={pendingEditCoverFile}
+                onFileSelect={(file, previewUrl) => {
+                  setPendingEditCoverFile(file);
+                  setEditCoverUrl(previewUrl);
+                }}
+              />
+            </Box>
+
+            <TextField
+              label="Title"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              fullWidth
+              required
+            />
+
+            <TextField
+              label="Author"
+              value={editAuthor}
+              onChange={(e) => setEditAuthor(e.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="Comment"
+              value={editComment}
+              onChange={(e) => setEditComment(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+            />
+
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5, color: "text.secondary" }}>
+                Rating *
+              </Typography>
+              <StarRating
+                value={editRating}
+                onChange={(val) => setEditRating(val)}
+                size="medium"
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEditDialog} disabled={savingEdit}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            variant="contained"
+            disabled={savingEdit || !editTitle.trim() || !editRating}
+          >
+            {savingEdit ? "Saving..." : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
