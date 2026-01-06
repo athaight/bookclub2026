@@ -24,6 +24,8 @@ This project was built using **vibe coding** — a development approach where yo
 
 ## 🚀 The Product
 
+**[bookbrosbookclub.com](https://bookbrosbookclub.com/)**
+
 **Book Bros Book Club** is a private book club tracker for a group of friends to:
 - Track reading progress with a **2026 Reading Challenge** (who can read the most books in 2026)
 - Share **Top Ten** favorite books with drag-and-drop ranking
@@ -105,4 +107,4 @@ Deploy on [Vercel](https://vercel.com) — just connect your repo and add enviro
 
 ---
 
-*Built with ❤️ and vibes by the Book Bros*
+*Built with ❤️*
