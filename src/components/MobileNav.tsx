@@ -26,7 +26,7 @@ const navItems = [
 ];
 
 export default function MobileNav() {
-  const isMobile = useMediaQuery("(max-width:899px)");
+  const isMobile = useMediaQuery("(max-width:1199px)");
   const [open, setOpen] = useState(false);
 
   if (!isMobile) return null;

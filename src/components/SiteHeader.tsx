@@ -22,7 +22,7 @@ export default function SiteHeader() {
         <Box sx={{ flex: 1 }} />
 
         {/* Desktop quick links (NO login here) */}
-        <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1 }}>
+        <Box sx={{ display: { xs: "none", lg: "flex" }, gap: 1 }}>
           <Button component={Link} href="/book-of-the-month">
             Book of the Month
           </Button>
