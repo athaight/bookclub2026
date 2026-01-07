@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { Box, CssBaseline, Container } from "@mui/material";
+import ThemeProvider from "@/components/ThemeProvider";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -23,7 +24,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <AppRouterCacheProvider>
-          <CssBaseline />
+          <ThemeProvider>
+            <CssBaseline />
 
           {/* Sticky footer page layout */}
           <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -69,6 +71,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
             <SiteFooter />
           </Box>
+          </ThemeProvider>
         </AppRouterCacheProvider>
       </body>
     </html>

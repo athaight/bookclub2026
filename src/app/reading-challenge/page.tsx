@@ -891,12 +891,14 @@ export default function HomePage() {
         <Typography variant="h3" component="h1" gutterBottom>
           Reading Challenge
         </Typography>
-        <Typography variant="h6" component="p" sx={{ mb: 2 }}>
-          2026
+        <Typography variant="h5" sx={{ mb: 2, color: 'text.secondary' }}>
+          The <strong>2026</strong> challenge is: Who can read the most books?
         </Typography>
-        <Typography variant="body1" sx={{ maxWidth: 700, mx: 'auto', color: 'text.secondary' }}>
-          Our 2026 challenge is to see who reads the most books this year. Here, you&apos;ll see what we&apos;re currently reading (up to three books at a time) and what we&apos;ve finished to determine which one of us is a true Bibliophile (1st place), or could be considered a Bookworm (2nd place), or just Bookish (3rd place).
-        </Typography>
+        <Box sx={{ maxWidth: 500, mx: 'auto', textAlign: 'center' }}>
+          <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
+            🏆 1st place: <strong>Bibliophile</strong> | 2nd: <strong>Bookworm</strong> | 3rd: <strong>Bookish</strong>
+          </Typography>
+        </Box>
       </Box>
 
       {err && (
