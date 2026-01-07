@@ -35,23 +35,33 @@ import { useProfiles } from "@/lib/useProfiles";
 const normEmail = (s: string) => s.trim().toLowerCase();
 
 // Member rotation starting from January 2026
-// Order: Nick (Jan), Wood (Feb), Andy (Mar), Nick (Apr), ...
+// Order is based on the order in NEXT_PUBLIC_MEMBERS_JSON
 const ROTATION_START = { year: 2026, month: 1 }; // January 2026
-const PICKER_ORDER = [
-  "cerrato0428@gmail.com",      // Nick
-  "woodroww.mccarthy@gmail.com", // Wood
-  "haight.haight@gmail.com",     // Andy
-];
+
+function getPickerOrder(): string[] {
+  // Get member emails from environment variable (same source as getMembers)
+  const raw = process.env.NEXT_PUBLIC_MEMBERS_JSON;
+  if (!raw) return [];
+  try {
+    const members = JSON.parse(raw) as { email: string; name: string }[];
+    return members.map(m => normEmail(m.email));
+  } catch {
+    return [];
+  }
+}
 
 function getPickerForMonth(year: number, month: number): string {
+  const pickerOrder = getPickerOrder();
+  if (pickerOrder.length === 0) return "";
+  
   // Calculate months since start
   const startMonths = ROTATION_START.year * 12 + (ROTATION_START.month - 1);
   const currentMonths = year * 12 + (month - 1);
   const monthsSinceStart = currentMonths - startMonths;
   
-  // Get picker index (cycling through the 3 members)
-  const pickerIndex = ((monthsSinceStart % 3) + 3) % 3; // Handle negative months gracefully
-  return normEmail(PICKER_ORDER[pickerIndex]);
+  // Get picker index (cycling through the members)
+  const pickerIndex = ((monthsSinceStart % pickerOrder.length) + pickerOrder.length) % pickerOrder.length;
+  return pickerOrder[pickerIndex];
 }
 
 function getCurrentYearMonth(): string {
