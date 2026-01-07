@@ -131,7 +131,7 @@ export default function BookReportViewPage({ params }: PageProps) {
 
       <Box sx={{ maxWidth: 800, mx: "auto" }}>
         {/* Header with book info */}
-        <Paper elevation={0} sx={{ p: 3, mb: 4, bgcolor: "grey.50" }}>
+        <Paper elevation={0} sx={{ p: 3, mb: 4, bgcolor: "background.paper" }}>
           <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
             {/* Book Cover */}
             {report.book_cover_url ? (
