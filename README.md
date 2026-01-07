@@ -20,7 +20,7 @@
 
 This project was built using **vibe coding** — a development approach where you describe what you want in natural language and an AI assistant (GitHub Copilot with Claude) writes the code. Instead of manually typing every line, you collaborate with AI to rapidly prototype, iterate, and build features conversationally.
 
-**This entire codebase was vibe-coded.** From the initial setup to accessibility audits, every feature was implemented through natural language prompts and AI-generated code.
+**This entire codebase was vibe-coded.** From the initial setup to accessibility audits, every feature was implemented through natural language prompts and AI-generated code. (small interventions and manual coding needed with lower models (e.g., chatGPT 4.1) as it made bad choices or instituted bad patterns) - Main AI used: Claude: Opus 4.5, Sonnet 4 & 4.1) 
 
 ## 🚀 The Product
 
