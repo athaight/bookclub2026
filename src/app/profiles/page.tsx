@@ -39,14 +39,16 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ShareIcon from "@mui/icons-material/Share";
 import Tooltip from "@mui/material/Tooltip";
 import Link from "next/link";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
 import { supabase } from "@/lib/supabaseClient";
-import { BookRow } from "@/types";
+import { BookRow, BookRecommendationRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import BookCoverImage from "@/components/BookCoverImage";
+import RecommendBookModal from "@/components/RecommendBookModal";
 
 type Member = { email: string; name: string };
 
@@ -105,6 +107,13 @@ export default function ProfilesPage() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error" | "warning" | "info">("info");
 
+  // Recommendations state
+  const [recommendationsToMe, setRecommendationsToMe] = useState<BookRecommendationRow[]>([]);
+  const [recommendationsFromMe, setRecommendationsFromMe] = useState<BookRecommendationRow[]>([]);
+  const [recommendModalOpen, setRecommendModalOpen] = useState(false);
+  const [bookToRecommend, setBookToRecommend] = useState<BookRow | null>(null);
+  const [addingRecommendedBook, setAddingRecommendedBook] = useState<string | null>(null);
+
   // Helper to check if a book exists in library
   const isBookInLibrary = (title: string, author: string) => {
     if (!selectedMember) return false;
@@ -151,6 +160,39 @@ export default function ProfilesPage() {
       fetchBooks();
     }
   }, [members]);
+
+  // Fetch recommendations for the selected member (public viewable)
+  useEffect(() => {
+    async function fetchRecommendations() {
+      if (!selectedMember) {
+        setRecommendationsToMe([]);
+        setRecommendationsFromMe([]);
+        return;
+      }
+
+      const [toMemberResult, fromMemberResult] = await Promise.all([
+        supabase
+          .from("book_recommendations")
+          .select("*")
+          .eq("to_email", selectedMember.email)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("book_recommendations")
+          .select("*")
+          .eq("from_email", selectedMember.email)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (!toMemberResult.error && toMemberResult.data) {
+        setRecommendationsToMe(toMemberResult.data);
+      }
+      if (!fromMemberResult.error && fromMemberResult.data) {
+        setRecommendationsFromMe(fromMemberResult.data);
+      }
+    }
+
+    fetchRecommendations();
+  }, [selectedMember]);
 
   // Wishlist search handler
   async function handleWishlistSearch() {
@@ -411,6 +453,115 @@ export default function ProfilesPage() {
     } finally {
       setSavingWishlistEdit(false);
     }
+  }
+
+  // Add a recommended book to library or wishlist
+  async function addRecommendedBookToList(rec: BookRecommendationRow, listType: "library" | "wishlist") {
+    if (!authedEmail) return;
+
+    setAddingRecommendedBook(rec.id);
+    try {
+      // Insert the book
+      const { error: insertError } = await supabase.from("books").insert({
+        member_email: authedEmail,
+        status: listType === "library" ? "completed" : "wishlist",
+        title: rec.book_title,
+        author: rec.book_author || "",
+        cover_url: rec.book_cover_url || null,
+        genre: rec.book_genre || null,
+        reading_challenge_year: new Date().getFullYear(),
+        top_ten: false,
+        in_library: listType === "library",
+      });
+
+      if (insertError) throw insertError;
+
+      // Update recommendation status to "added"
+      await supabase
+        .from("book_recommendations")
+        .update({ status: "added", updated_at: new Date().toISOString() })
+        .eq("id", rec.id);
+
+      // Refresh recommendations
+      const { data: toMeData } = await supabase
+        .from("book_recommendations")
+        .select("*")
+        .eq("to_email", authedEmail)
+        .order("created_at", { ascending: false });
+
+      if (toMeData) setRecommendationsToMe(toMeData);
+
+      // Refresh books
+      const { data: booksData } = await supabase
+        .from("books")
+        .select("*")
+        .in("member_email", members.map((m) => m.email));
+
+      if (booksData) {
+        const grouped: Record<string, BookRow[]> = {};
+        for (const m of members) {
+          grouped[m.email] = booksData.filter((b) => b.member_email === m.email);
+        }
+        setMemberBooks(grouped);
+      }
+
+      setSnackbarMessage(`Added "${rec.book_title}" to your ${listType}!`);
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error("Error adding recommended book:", error);
+      setSnackbarMessage("Failed to add book");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    } finally {
+      setAddingRecommendedBook(null);
+    }
+  }
+
+  // Dismiss a recommendation
+  async function dismissRecommendation(rec: BookRecommendationRow) {
+    if (!authedEmail) return;
+
+    try {
+      await supabase
+        .from("book_recommendations")
+        .update({ status: "dismissed", updated_at: new Date().toISOString() })
+        .eq("id", rec.id);
+
+      // Refresh recommendations
+      const { data: toMeData } = await supabase
+        .from("book_recommendations")
+        .select("*")
+        .eq("to_email", authedEmail)
+        .order("created_at", { ascending: false });
+
+      if (toMeData) setRecommendationsToMe(toMeData);
+
+      setSnackbarMessage("Recommendation dismissed");
+      setSnackbarSeverity("info");
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error("Error dismissing recommendation:", error);
+    }
+  }
+
+  // Open recommend modal for a book from library
+  function openRecommendModal(book: BookRow) {
+    setBookToRecommend(book);
+    setRecommendModalOpen(true);
+  }
+
+  function closeRecommendModal() {
+    setRecommendModalOpen(false);
+    setBookToRecommend(null);
+  }
+
+  // Get display name for a member email
+  function getDisplayNameForEmail(email: string): string {
+    const profile = profiles[email];
+    if (profile?.display_name) return profile.display_name;
+    const member = members.find((m) => m.email === email);
+    return member?.name || email;
   }
 
   // Calculate stats for selected member
@@ -1180,6 +1331,177 @@ export default function ProfilesPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Recommendations Section - Publicly viewable, actions only for owner */}
+          {(recommendationsToMe.length > 0 || recommendationsFromMe.length > 0) && (
+            <Box sx={{ mt: 3 }}>
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 600,
+                  mb: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <ShareIcon color="primary" />
+                Book Recommendations
+              </Typography>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                  gap: 3,
+                }}
+              >
+                {/* Recommendations TO this member */}
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      📬 Recommended to {getFirstName(selectedMember?.name || "")}
+                    </Typography>
+
+                    {recommendationsToMe.filter((r) => r.status === "pending").length > 0 ? (
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        {recommendationsToMe
+                          .filter((r) => r.status === "pending")
+                          .map((rec) => (
+                            <Box
+                              key={rec.id}
+                              sx={{
+                                display: "flex",
+                                gap: 2,
+                                p: 1.5,
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderRadius: 1,
+                              }}
+                            >
+                              {rec.book_cover_url && (
+                                <Box
+                                  component="img"
+                                  src={rec.book_cover_url}
+                                  alt={`Cover of ${rec.book_title}`}
+                                  sx={{ width: 50, height: 75, objectFit: "cover", borderRadius: 0.5 }}
+                                />
+                              )}
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="body1" fontWeight={500} noWrap>
+                                  {rec.book_title}
+                                </Typography>
+                                {rec.book_author && (
+                                  <Typography variant="body2" color="text.secondary" noWrap>
+                                    by {rec.book_author}
+                                  </Typography>
+                                )}
+                                <Typography variant="caption" color="primary">
+                                  From {getDisplayNameForEmail(rec.from_email)}
+                                </Typography>
+                                {rec.message && (
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ mt: 0.5, fontStyle: "italic", color: "text.secondary" }}
+                                  >
+                                    "{rec.message}"
+                                  </Typography>
+                                )}
+                                {/* Action buttons - only visible to profile owner */}
+                                {authedEmail === selectedMember?.email && (
+                                  <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      onClick={() => addRecommendedBookToList(rec, "library")}
+                                      disabled={addingRecommendedBook === rec.id}
+                                    >
+                                      {addingRecommendedBook === rec.id ? "Adding..." : "Add to Library"}
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() => addRecommendedBookToList(rec, "wishlist")}
+                                      disabled={addingRecommendedBook === rec.id}
+                                    >
+                                      Wishlist
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      color="inherit"
+                                      onClick={() => dismissRecommendation(rec)}
+                                    >
+                                      Dismiss
+                                    </Button>
+                                  </Box>
+                                )}
+                              </Box>
+                            </Box>
+                          ))}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                        No pending recommendations
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Recommendations FROM this member */}
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      📤 {getFirstName(selectedMember?.name || "")}'s Recommendations
+                    </Typography>
+
+                    {recommendationsFromMe.length > 0 ? (
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                        {recommendationsFromMe.slice(0, 5).map((rec) => (
+                          <Box
+                            key={rec.id}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.5,
+                              p: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              borderRadius: 1,
+                              opacity: rec.status === "dismissed" ? 0.5 : 1,
+                            }}
+                          >
+                            {rec.book_cover_url && (
+                              <Box
+                                component="img"
+                                src={rec.book_cover_url}
+                                alt={`Cover of ${rec.book_title}`}
+                                sx={{ width: 35, height: 52, objectFit: "cover", borderRadius: 0.5 }}
+                              />
+                            )}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={500} noWrap>
+                                {rec.book_title}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                To {getDisplayNameForEmail(rec.to_email)} •{" "}
+                                {rec.status === "pending" && "⏳ Pending"}
+                                {rec.status === "added" && "✅ Added"}
+                                {rec.status === "dismissed" && "❌ Dismissed"}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                        No recommendations sent yet
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Box>
+            </Box>
+          )}
         </>
       )}
 
@@ -1293,6 +1615,25 @@ export default function ProfilesPage() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Recommend Book Modal */}
+      <RecommendBookModal
+        open={recommendModalOpen}
+        onClose={closeRecommendModal}
+        book={bookToRecommend}
+        fromEmail={authedEmail || ""}
+        onSuccess={async () => {
+          // Refresh recommendations from me
+          if (authedEmail) {
+            const { data } = await supabase
+              .from("book_recommendations")
+              .select("*")
+              .eq("from_email", authedEmail)
+              .order("created_at", { ascending: false });
+            if (data) setRecommendationsFromMe(data);
+          }
+        }}
+      />
     </Container>
   );
 }

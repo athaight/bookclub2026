@@ -50,3 +50,17 @@ export type BookOfTheMonthRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type BookRecommendationRow = {
+  id: string;
+  from_email: string;
+  to_email: string;
+  book_title: string;
+  book_author?: string | null;
+  book_cover_url?: string | null;
+  book_genre?: string | null;
+  message?: string | null;
+  status: "pending" | "added" | "dismissed";
+  created_at: string;
+  updated_at: string;
+};
