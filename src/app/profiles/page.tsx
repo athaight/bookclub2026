@@ -40,6 +40,7 @@ import BookmarkIcon from "@mui/icons-material/Bookmark";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ShareIcon from "@mui/icons-material/Share";
+import ExploreIcon from "@mui/icons-material/Explore";
 import Tooltip from "@mui/material/Tooltip";
 import Link from "next/link";
 import { getMembers } from "@/lib/members";
@@ -49,6 +50,7 @@ import { BookRow, BookRecommendationRow } from "@/types";
 import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import BookCoverImage from "@/components/BookCoverImage";
 import RecommendBookModal from "@/components/RecommendBookModal";
+import BookDiscoveryModal from "@/components/BookDiscoveryModal";
 
 type Member = { email: string; name: string };
 
@@ -77,6 +79,9 @@ export default function ProfilesPage() {
   const [memberBooks, setMemberBooks] = useState<Record<string, BookRow[]>>({});
   const [loading, setLoading] = useState(false);
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
+
+  // Book Discovery Modal state
+  const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
 
   // Wishlist state
   const wishlistSearchInputRef = useRef<HTMLInputElement>(null);
@@ -138,24 +143,31 @@ export default function ProfilesPage() {
   }, []);
 
   // Fetch all books for all members
-  useEffect(() => {
-    async function fetchBooks() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("books")
-        .select("*")
-        .in("member_email", members.map((m) => m.email));
+  const fetchBooks = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("books")
+      .select("*")
+      .in("member_email", members.map((m) => m.email));
 
-      if (!error && data) {
-        const grouped: Record<string, BookRow[]> = {};
-        for (const m of members) {
-          grouped[m.email] = data.filter((b) => b.member_email === m.email);
-        }
-        setMemberBooks(grouped);
+    if (!error && data) {
+      const grouped: Record<string, BookRow[]> = {};
+      for (const m of members) {
+        grouped[m.email] = data.filter((b) => b.member_email === m.email);
       }
-      setLoading(false);
+      setMemberBooks(grouped);
+      // Ensure selectedMember is set to authedEmail after adding a book
+      if (authedEmail) {
+        const currentMember = members.find((m) => m.email === authedEmail);
+        if (currentMember && (!selectedMember || selectedMember.email !== authedEmail)) {
+          setSelectedMember(currentMember);
+        }
+      }
     }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     if (members.length > 0) {
       fetchBooks();
     }
@@ -768,6 +780,30 @@ export default function ProfilesPage() {
                     </Typography>
                   </Box>
                 </Box>
+                {/* Discovery Button - only show for own profile when logged in */}
+                {authedEmail && authedEmail === selectedMember.email && (
+                  <Tooltip title="Discover your next read">
+                    <Button
+                      variant="contained"
+                      startIcon={<ExploreIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDiscoveryModalOpen(true);
+                      }}
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.2)",
+                        color: "white",
+                        "&:hover": {
+                          bgcolor: "rgba(255,255,255,0.3)",
+                        },
+                        textTransform: "none",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Discover
+                    </Button>
+                  </Tooltip>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -1634,6 +1670,16 @@ export default function ProfilesPage() {
           }
         }}
       />
+
+      {/* Book Discovery Modal */}
+      {authedEmail && (
+        <BookDiscoveryModal
+          open={discoveryModalOpen}
+          onClose={() => setDiscoveryModalOpen(false)}
+          userEmail={authedEmail}
+          onWishlistUpdated={fetchBooks}
+        />
+      )}
     </Container>
   );
 }

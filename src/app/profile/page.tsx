@@ -17,9 +17,11 @@ import {
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import SaveIcon from "@mui/icons-material/Save";
 import LogoutIcon from "@mui/icons-material/Logout";
+import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { ProfileRow } from "@/types";
+import BookDiscoveryModal from "@/components/BookDiscoveryModal";
 
 const normEmail = (s: string) => s.trim().toLowerCase();
 
@@ -36,6 +38,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -227,6 +230,27 @@ export default function ProfilePage() {
       </Box>
 
       <Box sx={{ maxWidth: 500, mx: "auto" }}>
+        {/* Book Discovery Button - Prominent placement */}
+        <Box sx={{ mb: 3 }}>
+          <Button
+            variant="contained"
+            color="secondary"
+            size="large"
+            fullWidth
+            startIcon={<AutoStoriesIcon />}
+            onClick={() => setDiscoveryModalOpen(true)}
+            sx={{
+              py: 1.5,
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+            }}
+          >
+            📚 Discover Your Next Book
+          </Button>
+        </Box>
+
         <Card>
           <CardContent sx={{ display: "flex", flexDirection: "column", gap: 3, p: 3 }}>
             {/* Avatar Section */}
@@ -313,6 +337,15 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </Box>
+
+      {/* Book Discovery Modal */}
+      {authedEmail && (
+        <BookDiscoveryModal
+          open={discoveryModalOpen}
+          onClose={() => setDiscoveryModalOpen(false)}
+          userEmail={authedEmail}
+        />
+      )}
     </>
   );
 }

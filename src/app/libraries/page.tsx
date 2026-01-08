@@ -35,7 +35,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
-import ShareIcon from "@mui/icons-material/Share";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -44,7 +43,6 @@ import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
 import MemberAvatar from "@/components/MemberAvatar";
 import BookCoverImage from "@/components/BookCoverImage";
-import RecommendBookModal from "@/components/RecommendBookModal";
 
 type Member = { email: string; name: string };
 
@@ -56,18 +54,14 @@ function LibraryBookCard({
   onDelete,
   onEdit,
   onAdd,
-  onRecommend,
   canAdd,
-  canRecommend,
 }: {
   row: BookRow;
   isOwner?: boolean;
   onDelete?: (row: BookRow) => void;
   onEdit?: (row: BookRow) => void;
   onAdd?: (row: BookRow) => void;
-  onRecommend?: (row: BookRow) => void;
   canAdd?: boolean;
-  canRecommend?: boolean;
 }) {
   return (
     <Card sx={{ mb: 1 }}>
@@ -76,8 +70,6 @@ function LibraryBookCard({
           <BookCoverImage
             coverUrl={row.cover_url}
             title={row.title || "Book"}
-            author={row.author}
-            genre={row.genre}
             variant="default"
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -99,17 +91,6 @@ function LibraryBookCard({
 
           {isOwner ? (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-              {canRecommend && onRecommend && (
-                <IconButton
-                  aria-label="recommend to others"
-                  onClick={() => onRecommend(row)}
-                  size="small"
-                  color="primary"
-                  title="Recommend to others"
-                >
-                  <ShareIcon fontSize="small" />
-                </IconButton>
-              )}
               {onEdit && (
                 <IconButton
                   aria-label="edit"
@@ -205,20 +186,6 @@ export default function OurLibrariesPage() {
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
   const [bookToAdd, setBookToAdd] = useState<BookRow | null>(null);
   const [addingBook, setAddingBook] = useState(false);
-
-  // Recommend book state
-  const [recommendModalOpen, setRecommendModalOpen] = useState(false);
-  const [bookToRecommend, setBookToRecommend] = useState<BookRow | null>(null);
-
-  function openRecommendModal(book: BookRow) {
-    setBookToRecommend(book);
-    setRecommendModalOpen(true);
-  }
-
-  function closeRecommendModal() {
-    setRecommendModalOpen(false);
-    setBookToRecommend(null);
-  }
 
   useEffect(() => {
     const init: Record<string, boolean> = {};
@@ -569,6 +536,15 @@ export default function OurLibrariesPage() {
           .eq("id", editingBook.id);
 
         if (error) throw new Error(error.message);
+
+        // If a cover was uploaded, propagate it to all matching books across all users
+        if (coverWasUploaded && finalCoverUrl) {
+          await supabase
+            .from("books")
+            .update({ cover_url: finalCoverUrl })
+            .ilike("title", title)
+            .ilike("author", author || "");
+        }
       } else {
         // Check for duplicates when adding
         const existingBook = libraryBooks.find(
@@ -599,6 +575,15 @@ export default function OurLibrariesPage() {
         });
 
         if (error) throw new Error(error.message);
+
+        // If a cover was uploaded, propagate it to all matching books across all users
+        if (coverWasUploaded && finalCoverUrl) {
+          await supabase
+            .from("books")
+            .update({ cover_url: finalCoverUrl })
+            .ilike("title", title)
+            .ilike("author", author || "");
+        }
       }
 
       handleDialogClose();
@@ -722,9 +707,7 @@ export default function OurLibrariesPage() {
               onDelete={handleDeleteClick}
               onEdit={handleEditClick}
               onAdd={handleAddToListClick}
-              onRecommend={openRecommendModal}
               canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
-              canRecommend={!!authedEmail && isOwner}
             />
           ))
         ) : (
@@ -764,9 +747,7 @@ export default function OurLibrariesPage() {
               onDelete={handleDeleteClick}
               onEdit={handleEditClick}
               onAdd={handleAddToListClick}
-              onRecommend={openRecommendModal}
               canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
-              canRecommend={!!authedEmail && isOwner}
             />
           ))
         ) : (
@@ -924,7 +905,6 @@ export default function OurLibrariesPage() {
                             coverUrl={book.coverUrl}
                             title={book.title}
                             variant="small"
-                            disableModal
                           />
                           <Box sx={{ ml: 1.5 }}>
                             <ListItemText
@@ -979,7 +959,6 @@ export default function OurLibrariesPage() {
               coverUrl={formCoverUrl}
               title={formTitle || "Book"}
               variant="large"
-              disableModal
             />
             <Box sx={{ ml: 2, flex: 1 }}>
               {formTitle && (
@@ -1173,14 +1152,6 @@ export default function OurLibrariesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Recommend Book Modal */}
-      <RecommendBookModal
-        open={recommendModalOpen}
-        onClose={closeRecommendModal}
-        book={bookToRecommend}
-        fromEmail={authedEmail || ""}
-      />
     </>
   );
 }
