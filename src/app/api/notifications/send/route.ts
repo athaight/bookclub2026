@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize Resend client to avoid build-time errors
+let resend: Resend | null = null;
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    return null;
+  }
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 // Use service role client for API routes
 const supabaseAdmin = createClient(
@@ -175,13 +184,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if RESEND_API_KEY is configured
-    if (!process.env.RESEND_API_KEY) {
+    const resendClient = getResend();
+    if (!resendClient) {
       console.warn('RESEND_API_KEY not configured, skipping email');
       return NextResponse.json({ success: true, skipped: 'no_api_key' });
     }
 
     // Send the email
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendClient.emails.send({
       from: 'Book Bros <notifications@bookbros.app>', // You'll need to verify this domain in Resend
       to: recipientEmail,
       subject: type === 'mention' 
