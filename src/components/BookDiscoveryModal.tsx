@@ -23,6 +23,7 @@ import {
   Divider,
   IconButton,
   Collapse,
+  Tooltip,
 } from '@mui/material';
 import {
   AutoStories,
@@ -32,6 +33,8 @@ import {
   ExpandLess,
   Add,
   CheckCircle,
+  Refresh,
+  AutoAwesome,
 } from '@mui/icons-material';
 
 interface BookDiscoveryModalProps {
@@ -72,6 +75,11 @@ export default function BookDiscoveryModal({
   const [error, setError] = useState<string>('');
   const [savedBooks, setSavedBooks] = useState<Set<string>>(new Set());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  
+  // New state for perpetual generation
+  const [excludedBooks, setExcludedBooks] = useState<string[]>([]); // Track all suggested books this session
+  const [similarTo, setSimilarTo] = useState<{ title: string; author: string } | null>(null); // "More like this" book
+  const [loadingMore, setLoadingMore] = useState(false); // Loading state for "generate more"
 
   // Reset modal state
   const handleClose = () => {
@@ -83,6 +91,9 @@ export default function BookDiscoveryModal({
     setError('');
     setSavedBooks(new Set());
     setExpandedCards(new Set());
+    setExcludedBooks([]); // Reset excluded books on close
+    setSimilarTo(null); // Reset "more like this" selection
+    setLoadingMore(false);
     onClose();
   };
 
@@ -100,6 +111,8 @@ export default function BookDiscoveryModal({
           userEmail,
           mode: 'instant',
           includeAllBros,
+          excludedBooks,
+          similarTo,
         }),
       });
 
@@ -109,8 +122,14 @@ export default function BookDiscoveryModal({
         throw new Error(data.error || 'Failed to generate recommendations');
       }
 
-      setRecommendations(data.recommendations || []);
+      const newRecs = data.recommendations || [];
+      setRecommendations(newRecs);
       setConversationId(data.conversationId);
+      
+      // Track these books as excluded for future "generate more" requests
+      const newExcluded = newRecs.map((r: BookRecommendation) => `${r.title}|${r.author}`);
+      setExcludedBooks(prev => [...prev, ...newExcluded]);
+      
       setStep('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -133,6 +152,8 @@ export default function BookDiscoveryModal({
           mode: 'conversational',
           includeAllBros,
           conversationHistory: [],
+          excludedBooks,
+          similarTo,
         }),
       });
 
@@ -149,8 +170,14 @@ export default function BookDiscoveryModal({
         setStep('chat');
       } else {
         // Got recommendations immediately
-        setRecommendations(data.recommendations || []);
+        const newRecs = data.recommendations || [];
+        setRecommendations(newRecs);
         setConversationId(data.conversationId);
+        
+        // Track these books as excluded for future "generate more" requests
+        const newExcluded = newRecs.map((r: BookRecommendation) => `${r.title}|${r.author}`);
+        setExcludedBooks(prev => [...prev, ...newExcluded]);
+        
         setStep('results');
       }
     } catch (err) {
@@ -181,6 +208,8 @@ export default function BookDiscoveryModal({
           mode: 'conversational',
           includeAllBros,
           conversationHistory: newHistory,
+          excludedBooks,
+          similarTo,
         }),
       });
 
@@ -200,13 +229,113 @@ export default function BookDiscoveryModal({
         setStep('chat');
       } else {
         // Final recommendations
-        setRecommendations(data.recommendations || []);
+        const newRecs = data.recommendations || [];
+        setRecommendations(newRecs);
+        
+        // Track these books as excluded for future "generate more" requests
+        const newExcluded = newRecs.map((r: BookRecommendation) => `${r.title}|${r.author}`);
+        setExcludedBooks(prev => [...prev, ...newExcluded]);
+        
         setStep('results');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setStep('chat');
     }
+  };
+
+  // Generate more suggestions (perpetual generation)
+  const handleGenerateMore = async () => {
+    setLoadingMore(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/recommendations/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userEmail,
+          userEmail,
+          mode: 'instant',
+          includeAllBros,
+          excludedBooks,
+          similarTo,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate more recommendations');
+      }
+
+      const newRecs = data.recommendations || [];
+      
+      // Append new recommendations to existing list
+      setRecommendations(prev => [...prev, ...newRecs]);
+      
+      // Track these books as excluded for future requests
+      const newExcluded = newRecs.map((r: BookRecommendation) => `${r.title}|${r.author}`);
+      setExcludedBooks(prev => [...prev, ...newExcluded]);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Handle "More like this" - set a book as the similarity anchor
+  const handleMoreLikeThis = (book: BookRecommendation) => {
+    setSimilarTo({ title: book.title, author: book.author });
+    // Automatically generate new suggestions based on this book
+    handleGenerateMoreLikeThis(book);
+  };
+
+  // Generate more books similar to a specific book
+  const handleGenerateMoreLikeThis = async (book: BookRecommendation) => {
+    setLoadingMore(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/recommendations/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userEmail,
+          userEmail,
+          mode: 'instant',
+          includeAllBros,
+          excludedBooks,
+          similarTo: { title: book.title, author: book.author },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate similar recommendations');
+      }
+
+      const newRecs = data.recommendations || [];
+      
+      // Append new recommendations to existing list
+      setRecommendations(prev => [...prev, ...newRecs]);
+      
+      // Track these books as excluded for future requests
+      const newExcluded = newRecs.map((r: BookRecommendation) => `${r.title}|${r.author}`);
+      setExcludedBooks(prev => [...prev, ...newExcluded]);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Clear "more like this" filter
+  const handleClearSimilarTo = () => {
+    setSimilarTo(null);
   };
 
   // Save book to wishlist
@@ -435,18 +564,41 @@ export default function BookDiscoveryModal({
               </Alert>
             ) : (
               <>
-                <Typography variant="body1" sx={{ mb: 3 }}>
-                  Here are {recommendations.length} books we think you'll love:
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography variant="body1">
+                    {recommendations.length} book{recommendations.length !== 1 ? 's' : ''} discovered:
+                  </Typography>
+                  
+                  {/* Show "More like this" filter indicator */}
+                  {similarTo && (
+                    <Chip
+                      icon={<AutoAwesome />}
+                      label={`Similar to "${similarTo.title}"`}
+                      onDelete={handleClearSimilarTo}
+                      color="primary"
+                      variant="outlined"
+                      size="small"
+                    />
+                  )}
+                </Box>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {recommendations.map((book) => {
-                    const bookKey = `${book.title}|${book.author}`;
-                    const isSaved = savedBooks.has(bookKey);
+                  {recommendations.map((book, index) => {
+                    const bookKey = `${book.title}|${book.author}|${index}`;
+                    const isSaved = savedBooks.has(`${book.title}|${book.author}`);
                     const isExpanded = expandedCards.has(bookKey);
+                    const isSimilarToAnchor = similarTo?.title === book.title && similarTo?.author === book.author;
 
                     return (
-                      <Card key={bookKey} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' } }}>
+                      <Card 
+                        key={bookKey} 
+                        sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          border: isSimilarToAnchor ? '2px solid' : 'none',
+                          borderColor: 'primary.main',
+                        }}
+                      >
                         {book.coverUrl && (
   <CardMedia
     component="img"
@@ -512,7 +664,19 @@ export default function BookDiscoveryModal({
                             )}
                           </CardContent>
 
-                          <CardActions sx={{ justifyContent: 'flex-end' }}>
+                          <CardActions sx={{ justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1 }}>
+                            <Tooltip title="Find more books like this one">
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<AutoAwesome />}
+                                onClick={() => handleMoreLikeThis(book)}
+                                disabled={loadingMore || isSimilarToAnchor}
+                                color="secondary"
+                              >
+                                {isSimilarToAnchor ? 'Finding similar...' : 'More like this'}
+                              </Button>
+                            </Tooltip>
                             <Button
                               variant={isSaved ? 'outlined' : 'contained'}
                               size="small"
@@ -527,6 +691,20 @@ export default function BookDiscoveryModal({
                       </Card>
                     );
                   })}
+                  
+                  {/* Generate More Suggestions Button */}
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Button
+                      variant="outlined"
+                      size="large"
+                      startIcon={loadingMore ? <CircularProgress size={20} /> : <Refresh />}
+                      onClick={handleGenerateMore}
+                      disabled={loadingMore}
+                      sx={{ px: 4 }}
+                    >
+                      {loadingMore ? 'Finding more books...' : 'Generate More Suggestions'}
+                    </Button>
+                  </Box>
                 </Box>
               </>
             )}

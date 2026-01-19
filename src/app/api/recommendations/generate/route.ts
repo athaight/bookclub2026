@@ -27,6 +27,9 @@ export interface GenerateRequest {
   mode: 'instant' | 'conversational';
   includeAllBros: boolean;
   conversationHistory?: Message[];
+  // New fields for perpetual generation
+  excludedBooks?: string[]; // Books already suggested this session (title|author format)
+  similarTo?: { title: string; author: string } | null; // "More like this" book
 }
 
 export interface Message {
@@ -56,7 +59,15 @@ export interface BookRecommendation {
 export async function POST(request: NextRequest) {
   try {
     const body: GenerateRequest = await request.json();
-    const { userId, userEmail, mode, includeAllBros, conversationHistory = [] } = body;
+    const { 
+      userId, 
+      userEmail, 
+      mode, 
+      includeAllBros, 
+      conversationHistory = [],
+      excludedBooks = [],
+      similarTo = null,
+    } = body;
 
     // Validate required fields
     if (!userId || !userEmail) {
@@ -91,7 +102,9 @@ export async function POST(request: NextRequest) {
         readingContext,
         conversationHistory,
         includeAllBros,
-        readingData.memberNames
+        readingData.memberNames,
+        excludedBooks,
+        similarTo
       );
 
       // Validate recommendations
@@ -191,33 +204,62 @@ async function generateRecommendations(
   readingContext: string,
   conversationHistory: Message[],
   includeAllBros: boolean,
-  memberNames: { [email: string]: string }
+  memberNames: { [email: string]: string },
+  excludedBooks: string[] = [],
+  similarTo: { title: string; author: string } | null = null
 ): Promise<Array<{ title: string; author: string; why: string }>> {
   const broNames = Object.values(memberNames).join(', ');
   const conversationContext = conversationHistory.length > 0
     ? `\n\nConversation so far:\n${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}`
     : '';
+  
+  // Build exclusion list for prompt
+  const exclusionContext = excludedBooks.length > 0
+    ? `\n\nDO NOT RECOMMEND THESE BOOKS (already suggested this session):\n${excludedBooks.map(b => `- ${b.replace('|', ' by ')}`).join('\n')}`
+    : '';
 
-  const prompt = `You are a book recommendation expert for a book club called "Book Bros" (members: ${broNames}).
+  // Build "similar to" context for targeted recommendations
+  const similarContext = similarTo
+    ? `\n\nFOCUS YOUR RECOMMENDATIONS: The user specifically wants books similar to "${similarTo.title}" by ${similarTo.author}. Analyze what makes that book special (themes, writing style, genre, pacing, emotional impact, character types, setting) and find books that share those key qualities. Still personalize based on their reading profile.`
+    : '';
 
-${readingContext}${conversationContext}
+  const prompt = `You are an expert literary curator with deep knowledge of books across all genres, time periods, and cultures. You're recommending for "Book Bros" book club (members: ${broNames}).
+
+${readingContext}${conversationContext}${exclusionContext}${similarContext}
 
 Based on this reading profile, recommend 5 books that would be perfect for this reader.
 
 CRITICAL REQUIREMENTS:
-1. Only recommend REAL, PUBLISHED books that are widely available (not rare or out of print)
-2. Do NOT recommend books already in their library, top tens, or wishlist
-3. Match their taste based on genres, ratings, and favorite books
-4. Provide a compelling "WHY" for each recommendation (2-3 sentences explaining the match)
-5. Consider their reading stats and patterns
+1. VARIETY IS KEY: Recommend from a BROAD range of sources:
+   - Include at least one classic (pre-1970)
+   - Include at least one contemporary (post-2015)
+   - Mix genres thoughtfully - if they love thrillers, maybe include a literary thriller or a mystery with thriller elements
+   - Consider international authors and translated works
+   - Don't just recommend obvious bestsellers - dig deeper into each genre
+   
+2. QUALITY STANDARDS:
+   - Only recommend REAL, PUBLISHED books that are widely available
+   - Do NOT recommend books already in their library, top tens, wishlist, or excluded list
+   - Each book should be genuinely excellent, not just fitting a category
+   
+3. PERSONALIZATION:
+   - Match their taste based on genres, ratings, and favorite books
+   - Consider their reading stats and patterns
+   - If they rate 5 stars on character-driven books, lean that direction
+   - Look at what they've commented positively about
+   
+4. COMPELLING EXPLANATIONS:
+   - Each "why" should be 2-3 sentences that genuinely explain the connection
+   - Reference specific books from their library when making comparisons
+   - Be specific: "If you loved the unreliable narrator in X, you'll appreciate..." 
 
-${includeAllBros ? 'NOTE: You have access to all Book Bros reading data. Feel free to draw connections between members\' tastes.' : ''}
+${includeAllBros ? 'NOTE: You have access to all Book Bros reading data. Draw interesting connections between members\' tastes and suggest books that might bridge different preferences.' : ''}
 
 Return ONLY a JSON array with this exact structure (no markdown, no extra text):
 [
   {
     "title": "Book Title",
-    "author": "Author Name",
+    "author": "Author Name", 
     "why": "Compelling explanation of why this matches their taste..."
   }
 ]`;
