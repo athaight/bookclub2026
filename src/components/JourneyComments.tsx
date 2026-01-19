@@ -252,7 +252,7 @@ function CommentItem({
               </Box>
             </Box>
           ) : (
-            <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>
+            <Typography component="div" variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>
               {renderContentWithMentions(comment.content, members)}
             </Typography>
           )}
