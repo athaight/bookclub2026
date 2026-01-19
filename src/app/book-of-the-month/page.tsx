@@ -31,6 +31,7 @@ import { BookOfTheMonthRow } from "@/types";
 import { searchBooks, getBookDetails, BookSearchResult } from "@/lib/bookSearch";
 import MemberAvatar from "@/components/MemberAvatar";
 import BookCoverImage from "@/components/BookCoverImage";
+import JourneyComments from "@/components/JourneyComments";
 import { useProfiles } from "@/lib/useProfiles";
 
 const normEmail = (s: string) => s.trim().toLowerCase();
@@ -577,6 +578,25 @@ export default function BookOfTheMonthPage() {
               </Accordion>
             </motion.div>
           )}
+
+          {/* Journey Comments Section */}
+          <Box sx={{ mt: 4, mb: 4 }}>
+            <Box
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                p: 2,
+              }}
+            >
+              <JourneyComments
+                bookOfMonthId={bookOfMonth.id}
+                currentUserEmail={authedEmail}
+                profiles={profiles}
+                members={members}
+              />
+            </Box>
+          </Box>
         </Box>
       ) : (
         <Box sx={{ textAlign: "center", py: 8 }}>

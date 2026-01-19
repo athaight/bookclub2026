@@ -1,0 +1,325 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Use service role client for API routes (bypasses RLS)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
+
+export interface JourneyComment {
+  id: string;
+  book_of_month_id: string;
+  author_email: string;
+  content: string;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  author_name?: string;
+  author_avatar?: string;
+  reactions?: ReactionGroup[];
+  replies?: JourneyComment[];
+  mentions?: string[];
+}
+
+export interface ReactionGroup {
+  emoji: string;
+  count: number;
+  users: string[]; // emails of users who reacted
+}
+
+// GET - Fetch comments for a book of the month
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const bookOfMonthId = searchParams.get('bookOfMonthId');
+
+    if (!bookOfMonthId) {
+      return NextResponse.json(
+        { error: 'bookOfMonthId is required' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch all comments for this book (including replies)
+    const { data: comments, error: commentsError } = await supabaseAdmin
+      .from('journey_comments')
+      .select('*')
+      .eq('book_of_month_id', bookOfMonthId)
+      .order('created_at', { ascending: true });
+
+    if (commentsError) throw commentsError;
+
+    if (!comments || comments.length === 0) {
+      return NextResponse.json({ comments: [] });
+    }
+
+    // Get all comment IDs
+    const commentIds = comments.map(c => c.id);
+
+    // Fetch reactions for all comments
+    const { data: reactions, error: reactionsError } = await supabaseAdmin
+      .from('journey_comment_reactions')
+      .select('*')
+      .in('comment_id', commentIds);
+
+    if (reactionsError) throw reactionsError;
+
+    // Fetch mentions for all comments
+    const { data: mentions, error: mentionsError } = await supabaseAdmin
+      .from('journey_comment_mentions')
+      .select('*')
+      .in('comment_id', commentIds);
+
+    if (mentionsError) throw mentionsError;
+
+    // Get unique author emails
+    const authorEmails = [...new Set(comments.map(c => c.author_email))];
+
+    // Fetch author profiles
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('email, display_name, avatar_url')
+      .in('email', authorEmails);
+
+    if (profilesError) throw profilesError;
+
+    // Create lookup maps
+    const profileMap = new Map(profiles?.map(p => [p.email, p]) || []);
+    
+    // Group reactions by comment
+    const reactionsByComment = new Map<string, ReactionGroup[]>();
+    reactions?.forEach(r => {
+      if (!reactionsByComment.has(r.comment_id)) {
+        reactionsByComment.set(r.comment_id, []);
+      }
+      const groups = reactionsByComment.get(r.comment_id)!;
+      const existingGroup = groups.find(g => g.emoji === r.emoji);
+      if (existingGroup) {
+        existingGroup.count++;
+        existingGroup.users.push(r.user_email);
+      } else {
+        groups.push({ emoji: r.emoji, count: 1, users: [r.user_email] });
+      }
+    });
+
+    // Group mentions by comment
+    const mentionsByComment = new Map<string, string[]>();
+    mentions?.forEach(m => {
+      if (!mentionsByComment.has(m.comment_id)) {
+        mentionsByComment.set(m.comment_id, []);
+      }
+      mentionsByComment.get(m.comment_id)!.push(m.mentioned_email);
+    });
+
+    // Enrich comments with profile data, reactions, mentions
+    const enrichedComments: JourneyComment[] = comments.map(comment => {
+      const profile = profileMap.get(comment.author_email);
+      return {
+        ...comment,
+        author_name: profile?.display_name || comment.author_email.split('@')[0],
+        author_avatar: profile?.avatar_url || null,
+        reactions: reactionsByComment.get(comment.id) || [],
+        mentions: mentionsByComment.get(comment.id) || [],
+      };
+    });
+
+    // Organize into tree structure (top-level comments with nested replies)
+    const topLevelComments = enrichedComments.filter(c => !c.parent_id);
+    const repliesMap = new Map<string, JourneyComment[]>();
+    
+    enrichedComments.filter(c => c.parent_id).forEach(reply => {
+      if (!repliesMap.has(reply.parent_id!)) {
+        repliesMap.set(reply.parent_id!, []);
+      }
+      repliesMap.get(reply.parent_id!)!.push(reply);
+    });
+
+    // Attach replies to parent comments
+    const commentsWithReplies = topLevelComments.map(comment => ({
+      ...comment,
+      replies: repliesMap.get(comment.id) || [],
+    }));
+
+    return NextResponse.json({ comments: commentsWithReplies });
+
+  } catch (error) {
+    console.error('Error fetching journey comments:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch comments' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Create a new comment
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { bookOfMonthId, authorEmail, content, parentId, mentions } = body;
+
+    if (!bookOfMonthId || !authorEmail || !content) {
+      return NextResponse.json(
+        { error: 'bookOfMonthId, authorEmail, and content are required' },
+        { status: 400 }
+      );
+    }
+
+    // Insert the comment
+    const { data: comment, error: commentError } = await supabaseAdmin
+      .from('journey_comments')
+      .insert({
+        book_of_month_id: bookOfMonthId,
+        author_email: authorEmail,
+        content: content.trim(),
+        parent_id: parentId || null,
+      })
+      .select()
+      .single();
+
+    if (commentError) throw commentError;
+
+    // Insert mentions if any
+    if (mentions && mentions.length > 0) {
+      const mentionInserts = mentions.map((email: string) => ({
+        comment_id: comment.id,
+        mentioned_email: email,
+      }));
+
+      await supabaseAdmin
+        .from('journey_comment_mentions')
+        .insert(mentionInserts);
+    }
+
+    // Fetch author profile for response
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('email, display_name, avatar_url')
+      .eq('email', authorEmail)
+      .single();
+
+    return NextResponse.json({
+      comment: {
+        ...comment,
+        author_name: profile?.display_name || authorEmail.split('@')[0],
+        author_avatar: profile?.avatar_url || null,
+        reactions: [],
+        replies: [],
+        mentions: mentions || [],
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating journey comment:', error);
+    return NextResponse.json(
+      { error: 'Failed to create comment' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update a comment
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { commentId, authorEmail, content } = body;
+
+    if (!commentId || !authorEmail || !content) {
+      return NextResponse.json(
+        { error: 'commentId, authorEmail, and content are required' },
+        { status: 400 }
+      );
+    }
+
+    // Verify ownership
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from('journey_comments')
+      .select('author_email')
+      .eq('id', commentId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    if (existing.author_email !== authorEmail) {
+      return NextResponse.json(
+        { error: 'Not authorized to edit this comment' },
+        { status: 403 }
+      );
+    }
+
+    // Update the comment
+    const { data: comment, error: updateError } = await supabaseAdmin
+      .from('journey_comments')
+      .update({ content: content.trim() })
+      .eq('id', commentId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    return NextResponse.json({ comment });
+
+  } catch (error) {
+    console.error('Error updating journey comment:', error);
+    return NextResponse.json(
+      { error: 'Failed to update comment' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Delete a comment
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const commentId = searchParams.get('commentId');
+    const authorEmail = searchParams.get('authorEmail');
+
+    if (!commentId || !authorEmail) {
+      return NextResponse.json(
+        { error: 'commentId and authorEmail are required' },
+        { status: 400 }
+      );
+    }
+
+    // Verify ownership
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from('journey_comments')
+      .select('author_email')
+      .eq('id', commentId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    if (existing.author_email !== authorEmail) {
+      return NextResponse.json(
+        { error: 'Not authorized to delete this comment' },
+        { status: 403 }
+      );
+    }
+
+    // Delete the comment (cascades to reactions and mentions)
+    const { error: deleteError } = await supabaseAdmin
+      .from('journey_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (deleteError) throw deleteError;
+
+    return NextResponse.json({ success: true });
+
+  } catch (error) {
+    console.error('Error deleting journey comment:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete comment' },
+      { status: 500 }
+    );
+  }
+}
