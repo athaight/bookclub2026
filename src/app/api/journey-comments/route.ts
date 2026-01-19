@@ -205,10 +205,80 @@ export async function POST(request: NextRequest) {
       .eq('email', authorEmail)
       .single();
 
+    // Get book of the month info for email context
+    const { data: bookOfMonth } = await supabaseAdmin
+      .from('book_of_the_month')
+      .select('book_title')
+      .eq('id', bookOfMonthId)
+      .single();
+
+    const authorName = profile?.display_name || authorEmail.split('@')[0];
+    const bookTitle = bookOfMonth?.book_title || 'Book of the Month';
+
+    // Send notification emails (fire and forget - don't block response)
+    // Get all member emails for "all comments" notifications
+    const membersJson = process.env.NEXT_PUBLIC_MEMBERS_JSON;
+    let allMembers: { email: string; name: string }[] = [];
+    try {
+      if (membersJson) {
+        allMembers = JSON.parse(membersJson);
+      }
+    } catch (e) {
+      console.error('Error parsing members JSON:', e);
+    }
+
+    // Send mention notifications
+    if (mentions && mentions.length > 0) {
+      for (const mentionedEmail of mentions) {
+        const member = allMembers.find(m => m.email.toLowerCase() === mentionedEmail.toLowerCase());
+        if (member) {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/notifications/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'mention',
+              recipientEmail: mentionedEmail,
+              recipientName: member.name,
+              commenterName: authorName,
+              commenterEmail: authorEmail,
+              commentPreview: content.trim(),
+              commentId: comment.id,
+              bookTitle,
+              bookOfMonthId,
+            }),
+          }).catch(err => console.error('Error sending mention notification:', err));
+        }
+      }
+    }
+
+    // Send "all comments" notifications to members who have it enabled
+    // (excluding the author and anyone already mentioned)
+    const mentionedSet = new Set((mentions || []).map((e: string) => e.toLowerCase()));
+    for (const member of allMembers) {
+      if (member.email.toLowerCase() === authorEmail.toLowerCase()) continue;
+      if (mentionedSet.has(member.email.toLowerCase())) continue;
+      
+      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/notifications/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'new_comment',
+          recipientEmail: member.email,
+          recipientName: member.name,
+          commenterName: authorName,
+          commenterEmail: authorEmail,
+          commentPreview: content.trim(),
+          commentId: comment.id,
+          bookTitle,
+          bookOfMonthId,
+        }),
+      }).catch(err => console.error('Error sending new comment notification:', err));
+    }
+
     return NextResponse.json({
       comment: {
         ...comment,
-        author_name: profile?.display_name || authorEmail.split('@')[0],
+        author_name: authorName,
         author_avatar: profile?.avatar_url || null,
         reactions: [],
         replies: [],
