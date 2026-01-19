@@ -756,30 +756,7 @@ export default function ProfilesPage() {
             }}
           >
             <CardContent sx={{ py: 3 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-                <Avatar
-                  src={profiles[selectedMember.email]?.avatar_url || undefined}
-                  alt={getFirstName(selectedMember.name)}
-                  sx={{
-                    width: { xs: 80, sm: 100 },
-                    height: { xs: 80, sm: 100 },
-                    fontSize: { xs: 32, sm: 40 },
-                    border: "3px solid rgba(255,255,255,0.3)",
-                  }}
-                >
-                  {!profiles[selectedMember.email]?.avatar_url && getInitials(selectedMember.name)}
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {getFirstName(selectedMember.name)}
-                  </Typography>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                    <EmojiEventsIcon sx={{ fontSize: 20 }} />
-                    <Typography variant="body1">
-                      Rank #{stats.rankNumber} • {stats.rankLabel}
-                    </Typography>
-                  </Box>
-                </Box>
+              <Box sx={{ display: "flex", justifyContent: "center" }}>
                 {/* Discovery Button - only show for own profile when logged in */}
                 {authedEmail && authedEmail === selectedMember.email && (
                   <Tooltip title="Discover your next read">
@@ -800,7 +777,7 @@ export default function ProfilesPage() {
                         fontWeight: 600,
                       }}
                     >
-                      Discover
+                      Discover your next read
                     </Button>
                   </Tooltip>
                 )}
@@ -923,23 +900,25 @@ export default function ProfilesPage() {
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                   Books by Month
                 </Typography>
-                <Box sx={{ width: "100%", height: 180 }}>
-                  <BarChart
-                    xAxis={[
-                      {
-                        scaleType: "band",
-                        data: ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"],
-                      },
-                    ]}
-                    series={[
-                      {
-                        data: stats.monthlyData,
-                        color: "#667eea",
-                      },
-                    ]}
-                    height={180}
-                    margin={{ top: 10, bottom: 25, left: 30, right: 10 }}
-                  />
+                <Box sx={{ width: "100%", height: 180, px: 3, boxSizing: "border-box" }}>
+                  <Box sx={{ width: "100%" }}>
+                    <BarChart
+                      xAxis={[
+                        {
+                          scaleType: "band",
+                          data: ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"],
+                        },
+                      ]}
+                      series={[
+                        {
+                          data: stats.monthlyData,
+                          color: "#667eea",
+                        },
+                      ]}
+                      height={180}
+                      margin={{ top: 10, bottom: 25, left: 0, right: 0 }}
+                    />
+                  </Box>
                 </Box>
               </CardContent>
             </Card>

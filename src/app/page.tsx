@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, Button, Container, Typography } from "@mui/material";
+import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function LandingPage() {
@@ -11,6 +12,7 @@ export default function LandingPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        overflow: "hidden", // Prevent scroll from animations
       }}
     >
       <Container maxWidth="md">
@@ -20,62 +22,91 @@ export default function LandingPage() {
             py: { xs: 4, md: 0 },
           }}
         >
-          {/* Hero Title */}
-          <Typography
-            variant="h1"
-            component="h1"
-            sx={{
-              fontSize: { xs: "2.5rem", sm: "3.5rem", md: "4.5rem" },
-              fontWeight: 800,
-              mb: 3,
-              lineHeight: 1.1,
+          {/* Hero Title - slow up and in */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 1.2,
+              ease: [0.16, 1, 0.3, 1],
             }}
           >
-            Book Bros Book Club
-          </Typography>
-
-          {/* Quote */}
-          <Box sx={{ mb: 4 }}>
             <Typography
-              variant="h5"
-              component="blockquote"
+              variant="h1"
+              component="h1"
               sx={{
-                fontStyle: "italic",
-                color: "text.secondary",
-                mb: 1,
-                fontSize: { xs: "1.1rem", sm: "1.25rem", md: "1.5rem" },
+                fontSize: { xs: "2.5rem", sm: "3.5rem", md: "4.5rem" },
+                fontWeight: 800,
+                mb: 3,
+                lineHeight: 1.1,
               }}
             >
-              &ldquo;A person who won&apos;t read has no advantage over one who can&apos;t read.&rdquo;
+              Book Bros Book Club
             </Typography>
+          </motion.div>
+
+          {/* Quote - delayed quick fade in */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              duration: 0.5,
+              delay: 0.8,
+              ease: "easeOut",
+            }}
+          >
+            <Box sx={{ mb: 4 }}>
+              <Typography
+                variant="h5"
+                component="blockquote"
+                sx={{
+                  fontStyle: "italic",
+                  color: "text.secondary",
+                  mb: 1,
+                  fontSize: { xs: "1.1rem", sm: "1.25rem", md: "1.5rem" },
+                }}
+              >
+                &ldquo;A person who won&apos;t read has no advantage over one who can&apos;t read.&rdquo;
+              </Typography>
+              <Typography
+                variant="body1"
+                sx={{
+                  color: "text.secondary",
+                  fontWeight: 500,
+                }}
+              >
+                — Mark Twain
+              </Typography>
+            </Box>
+          </motion.div>
+
+          {/* Subheadline - up and in, staggered */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.6,
+              delay: 1.1,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
             <Typography
               variant="body1"
               sx={{
                 color: "text.secondary",
-                fontWeight: 500,
+                mb: 4,
+                maxWidth: 600,
+                mx: "auto",
+                fontSize: { xs: "1rem", md: "1.125rem" },
+                lineHeight: 1.7,
               }}
             >
-              — Mark Twain
+              This book club is for us to record our readings, discuss some, and suggest others. 
+              See our progress as we read and be sure to follow along on our 2026 challenge.
             </Typography>
-          </Box>
+          </motion.div>
 
-          {/* Subheadline */}
-          <Typography
-            variant="body1"
-            sx={{
-              color: "text.secondary",
-              mb: 4,
-              maxWidth: 600,
-              mx: "auto",
-              fontSize: { xs: "1rem", md: "1.125rem" },
-              lineHeight: 1.7,
-            }}
-          >
-            This book club is for us to record our readings, discuss some, and suggest others. 
-            See our progress as we read and be sure to follow along on our 2026 challenge.
-          </Typography>
-
-          {/* CTA Button */}
+          {/* CTA Button - no animation, always visible */}
           <Button
             component={Link}
             href="/book-of-the-month"

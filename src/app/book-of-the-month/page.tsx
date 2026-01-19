@@ -24,6 +24,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { BookOfTheMonthRow } from "@/types";
@@ -367,30 +368,77 @@ export default function BookOfTheMonthPage() {
 
   return (
     <>
-      <Box sx={{ textAlign: "center", mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Book of the Month
-        </Typography>
-        <Typography variant="h6" sx={{ color: "text.secondary", mb: 1 }}>
-          {formatMonthYear(currentMonth)}
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-          <Typography variant="body1" sx={{ color: "text.secondary" }}>
-            This month&apos;s book is picked by
+      <Box sx={{ textAlign: "center", mb: 4, overflow: "hidden" }}>
+        {/* Book of the Month title - slow up and in */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h3" component="h1" gutterBottom>
+            Book of the Month
           </Typography>
+        </motion.div>
+
+        {/* January 2026 - fade up and in */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h6" sx={{ color: "text.secondary", mb: 1 }}>
+            {formatMonthYear(currentMonth)}
+          </Typography>
+        </motion.div>
+
+        {/* Picker section - slide from center outward, wraps on small screens */}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 1 }}>
+          {/* "This month's book is picked by" - slide from center to left */}
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.8,
+              delay: 0.9,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
+            <Typography variant="body1" sx={{ color: "text.secondary" }}>
+              This month&apos;s book is picked by
+            </Typography>
+          </motion.div>
+
+          {/* Avatar & Name - slide from center to right */}
           {currentPicker && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <MemberAvatar 
-                name={currentPicker.name} 
-                email={currentPicker.email} 
-                profiles={profiles} 
-                size="small" 
-                linkToProfile 
-              />
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {currentPicker.name}
-              </Typography>
-            </Box>
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                duration: 0.8,
+                delay: 0.9,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <MemberAvatar 
+                  name={currentPicker.name} 
+                  email={currentPicker.email} 
+                  profiles={profiles} 
+                  size="small" 
+                  linkToProfile 
+                />
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {currentPicker.name}
+                </Typography>
+              </Box>
+            </motion.div>
           )}
           {authedEmail && (
             <IconButton onClick={handleOpenDialog} color="primary" size="small">
@@ -402,92 +450,132 @@ export default function BookOfTheMonthPage() {
 
       {bookOfMonth ? (
         <Box sx={{ maxWidth: 600, mx: "auto" }}>
-          {/* Book Title & Author */}
-          <Typography variant="h4" component="h2" sx={{ textAlign: "center", fontWeight: 600, mb: 1 }}>
-            {bookOfMonth.book_title}
-          </Typography>
-          <Typography variant="h6" sx={{ textAlign: "center", color: "text.secondary", mb: 3 }}>
-            by {bookOfMonth.book_author}
-          </Typography>
+          {/* Book Title - slide from center out to right */}
+          <motion.div
+            initial={{ opacity: 0, x: -60 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.8,
+              delay: 1.2,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
+            <Typography variant="h4" component="h2" sx={{ textAlign: "center", fontWeight: 600, mb: 1 }}>
+              {bookOfMonth.book_title}
+            </Typography>
+          </motion.div>
 
-          {/* Large Cover - Click to view summary */}
+          {/* Author - slide from center out to right (staggered) */}
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.7,
+              delay: 1.35,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
+            <Typography variant="h6" sx={{ textAlign: "center", color: "text.secondary", mb: 3 }}>
+              by {bookOfMonth.book_author}
+            </Typography>
+          </motion.div>
+
+          {/* Large Cover - Parallax effect */}
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 4 }}>
-            {bookOfMonth.book_cover_url ? (
-              <Avatar
-                src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
-                alt={`Cover of ${bookOfMonth.book_title} by ${bookOfMonth.book_author}`}
-                variant="rounded"
-                onClick={() => setSummaryModalOpen(true)}
-                onKeyDown={(e) => e.key === "Enter" && setSummaryModalOpen(true)}
-                role="button"
-                tabIndex={0}
-                aria-label={`View summary of ${bookOfMonth.book_title}`}
-                sx={{ 
-                  width: 336, 
-                  height: 504, 
-                  boxShadow: 3,
-                  cursor: "pointer",
-                  transition: "transform 0.2s, box-shadow 0.2s",
-                  "&:hover, &:focus": {
-                    transform: "scale(1.02)",
-                    boxShadow: 6,
-                    outline: "2px solid",
-                    outlineColor: "primary.main",
-                  },
-                  "& img": { objectFit: "cover" }
-                }}
-              />
-            ) : (
-              <Box
-                onClick={() => setSummaryModalOpen(true)}
-                onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && setSummaryModalOpen(true)}
-                role="button"
-                tabIndex={0}
-                aria-label="No cover image available. Click to view book details."
-                sx={{
-                  width: 240,
-                  height: 360,
-                  bgcolor: "action.hover",
-                  borderRadius: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: 3,
-                  cursor: "pointer",
-                  "&:hover, &:focus": {
-                    outline: "2px solid",
-                    outlineColor: "primary.main",
-                  },
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  No cover image
-                </Typography>
-              </Box>
-            )}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{
+                duration: 0.8,
+                delay: 1.5,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
+              {bookOfMonth.book_cover_url ? (
+                <Avatar
+                  src={bookOfMonth.book_cover_url.replace("-M.jpg", "-L.jpg")}
+                  alt={`Cover of ${bookOfMonth.book_title} by ${bookOfMonth.book_author}`}
+                  variant="rounded"
+                  onClick={() => setSummaryModalOpen(true)}
+                  onKeyDown={(e) => e.key === "Enter" && setSummaryModalOpen(true)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View summary of ${bookOfMonth.book_title}`}
+                  sx={{ 
+                    width: 336, 
+                    height: 504, 
+                    boxShadow: 3,
+                    cursor: "pointer",
+                    transition: "transform 0.2s, box-shadow 0.2s",
+                    "&:hover, &:focus": {
+                      transform: "scale(1.02)",
+                      boxShadow: 6,
+                      outline: "2px solid",
+                      outlineColor: "primary.main",
+                    },
+                    "& img": { objectFit: "cover" }
+                  }}
+                />
+              ) : (
+                <Box
+                  onClick={() => setSummaryModalOpen(true)}
+                  onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && setSummaryModalOpen(true)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="No cover image available. Click to view book details."
+                  sx={{
+                    width: 240,
+                    height: 360,
+                    bgcolor: "action.hover",
+                    borderRadius: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: 3,
+                    cursor: "pointer",
+                    "&:hover, &:focus": {
+                      outline: "2px solid",
+                      outlineColor: "primary.main",
+                    },
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    No cover image
+                  </Typography>
+                </Box>
+              )}
+            </motion.div>
             {bookOfMonth.book_summary && (
-              <Typography 
-                variant="caption" 
-                sx={{ mt: 1, color: "text.secondary", cursor: "pointer" }}
-                onClick={() => setSummaryModalOpen(true)}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 1.8 }}
               >
-                Click cover to view summary
-              </Typography>
+                <Typography 
+                  variant="caption" 
+                  sx={{ mt: 1, color: "text.secondary", cursor: "pointer" }}
+                  onClick={() => setSummaryModalOpen(true)}
+                >
+                  Click cover to view summary
+                </Typography>
+              </motion.div>
             )}
           </Box>
 
           {/* Why Picked Accordion */}
           {bookOfMonth.why_picked && currentPicker && (
-            <Accordion sx={{ mb: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">Why {currentPicker.name} Picked This Book</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                  {bookOfMonth.why_picked}
-                </Typography>
-              </AccordionDetails>
-            </Accordion>
+            <motion.div>
+              <Accordion sx={{ mb: 2 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="h6">Why {currentPicker.name} Picked This Book</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                    {bookOfMonth.why_picked}
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+            </motion.div>
           )}
         </Box>
       ) : (

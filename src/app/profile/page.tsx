@@ -222,10 +222,10 @@ export default function ProfilePage() {
     <>
       <Box sx={{ textAlign: "center", mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom>
-          My Profile
+          Admin
         </Typography>
         <Typography variant="body1" sx={{ color: "text.secondary" }}>
-          Manage your profile settings
+          Manage your admin settings
         </Typography>
       </Box>
 

@@ -48,6 +48,7 @@ const normEmail = (s: string) => s.trim().toLowerCase();
 function TopTenBookCard({
   row,
   index,
+  memberEmail,
   isOwner,
   onDelete,
   onEdit,
@@ -55,11 +56,16 @@ function TopTenBookCard({
   onDragOver,
   onDragEnd,
   onDrop,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
   isDragging,
   isDragOver,
 }: {
   row: BookRow;
   index: number;
+  memberEmail: string;
   isOwner?: boolean;
   onDelete?: (row: BookRow) => void;
   onEdit?: (row: BookRow) => void;
@@ -67,6 +73,10 @@ function TopTenBookCard({
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
   onDrop?: () => void;
+  onPointerDown?: (e: React.PointerEvent) => void;
+  onPointerMove?: (e: React.PointerEvent) => void;
+  onPointerUp?: (e: React.PointerEvent) => void;
+  onPointerCancel?: (e: React.PointerEvent) => void;
   isDragging?: boolean;
   isDragOver?: boolean;
 }) {
@@ -77,12 +87,20 @@ function TopTenBookCard({
         opacity: isDragging ? 0.5 : 1,
         border: isDragOver ? "2px dashed #667eea" : "none",
         transition: "all 0.2s ease",
+        // Prevent scroll while dragging on touch devices (iOS/Android)
+        touchAction: isOwner ? "none" : "auto",
       }}
       draggable={isOwner}
+      data-top-ten-index={index}
+      data-top-ten-member={memberEmail}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
       onDrop={onDrop}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     >
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
         {/* Drag Handle - top center on mobile, only show for owner */}
@@ -95,6 +113,7 @@ function TopTenBookCard({
               color: "text.secondary",
               "&:active": { cursor: "grabbing" },
               mb: 0.5,
+              touchAction: "none", // Prevent scroll when touching drag handle
             }}
           >
             <DragIndicatorIcon fontSize="small" sx={{ transform: "rotate(90deg)" }} />
@@ -234,6 +253,7 @@ export default function TopTensPage() {
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggedMemberEmail, setDraggedMemberEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const init: Record<string, boolean> = {};
@@ -751,8 +771,9 @@ export default function TopTensPage() {
   };
 
   // Drag and drop handlers
-  const handleDragStart = (index: number) => {
+  const handleDragStart = (index: number, memberEmail: string) => {
     setDraggedIndex(index);
+    setDraggedMemberEmail(memberEmail);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -765,9 +786,14 @@ export default function TopTensPage() {
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
+    setDraggedMemberEmail(null);
   };
 
   const handleDrop = async (targetIndex: number, memberEmail: string) => {
+    if (draggedMemberEmail && draggedMemberEmail !== memberEmail) {
+      handleDragEnd();
+      return;
+    }
     if (draggedIndex === null || draggedIndex === targetIndex) {
       handleDragEnd();
       return;
@@ -803,6 +829,54 @@ export default function TopTensPage() {
       // Refresh to restore correct order on error
       await refreshTopTenBooks();
     }
+  };
+
+  const getTouchTarget = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    if (!el) return null;
+    const card = el.closest<HTMLElement>("[data-top-ten-index][data-top-ten-member]");
+    if (!card) return null;
+    const indexAttr = card.getAttribute("data-top-ten-index");
+    const memberAttr = card.getAttribute("data-top-ten-member");
+    if (indexAttr == null || memberAttr == null) return null;
+    const parsedIndex = Number(indexAttr);
+    if (Number.isNaN(parsedIndex)) return null;
+    return { index: parsedIndex, memberEmail: memberAttr };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, index: number, memberEmail: string) => {
+    if (e.pointerType !== "touch") return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDraggedIndex(index);
+    setDraggedMemberEmail(memberEmail);
+    setDragOverIndex(index);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (e.pointerType !== "touch") return;
+    if (draggedIndex === null || draggedMemberEmail === null) return;
+    e.preventDefault();
+    const target = getTouchTarget(e.clientX, e.clientY);
+    if (!target || target.memberEmail !== draggedMemberEmail) return;
+    if (target.index !== dragOverIndex) {
+      setDragOverIndex(target.index);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType !== "touch") return;
+    const target = getTouchTarget(e.clientX, e.clientY);
+    if (target && draggedMemberEmail && target.memberEmail === draggedMemberEmail) {
+      void handleDrop(target.index, draggedMemberEmail);
+      return;
+    }
+    handleDragEnd();
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    if (e.pointerType !== "touch") return;
+    handleDragEnd();
   };
 
   // Handle delete book
@@ -909,13 +983,18 @@ export default function TopTensPage() {
               key={book.id}
               row={book}
               index={index}
+              memberEmail={m.email}
               isOwner={isOwner}
               onDelete={handleDeleteClick}
               onEdit={openEditDialog}
-              onDragStart={() => handleDragStart(index)}
+              onDragStart={() => handleDragStart(index, m.email)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
               onDrop={() => handleDrop(index, m.email)}
+              onPointerDown={isOwner ? (e) => handlePointerDown(e, index, m.email) : undefined}
+              onPointerMove={isOwner ? handlePointerMove : undefined}
+              onPointerUp={isOwner ? handlePointerUp : undefined}
+              onPointerCancel={isOwner ? handlePointerCancel : undefined}
               isDragging={draggedIndex === index}
               isDragOver={dragOverIndex === index}
             />
@@ -954,13 +1033,18 @@ export default function TopTensPage() {
               key={book.id}
               row={book}
               index={index}
+              memberEmail={m.email}
               isOwner={isOwner}
               onDelete={handleDeleteClick}
               onEdit={openEditDialog}
-              onDragStart={() => handleDragStart(index)}
+              onDragStart={() => handleDragStart(index, m.email)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
               onDrop={() => handleDrop(index, m.email)}
+              onPointerDown={isOwner ? (e) => handlePointerDown(e, index, m.email) : undefined}
+              onPointerMove={isOwner ? handlePointerMove : undefined}
+              onPointerUp={isOwner ? handlePointerUp : undefined}
+              onPointerCancel={isOwner ? handlePointerCancel : undefined}
               isDragging={draggedIndex === index}
               isDragOver={dragOverIndex === index}
             />

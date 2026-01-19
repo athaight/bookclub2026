@@ -173,7 +173,7 @@ export default function AdminPage() {
             },
           }}
         >
-          Profile
+          Admin
         </Button>
 
         <Button

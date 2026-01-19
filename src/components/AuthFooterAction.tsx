@@ -53,7 +53,7 @@ export default function AuthFooterAction({ loginHref = "/admin/login" }: Props) 
   return (
     <Box sx={{ display: "flex", gap: 1 }}>
       <Button size="small" component={Link} href="/profile" variant="text">
-        Profile
+        Admin
       </Button>
       <Button
         size="small"
