@@ -16,6 +16,7 @@ import {
   Divider,
   Switch,
   FormControlLabel,
+  Snackbar,
 } from "@mui/material";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import SaveIcon from "@mui/icons-material/Save";
@@ -49,6 +50,7 @@ export default function ProfilePage() {
   const [emailOnAllComments, setEmailOnAllComments] = useState(false);
   const [prefsLoading, setPrefsLoading] = useState(false);
   const [prefsSaving, setPrefsSaving] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -250,8 +252,7 @@ export default function ProfilePage() {
       });
       
       if (response.ok) {
-        setSuccess('Notification preferences saved!');
-        setTimeout(() => setSuccess(null), 3000);
+        setSnackbarOpen(true);
       } else {
         setError('Failed to save notification preferences');
       }
@@ -473,6 +474,23 @@ export default function ProfilePage() {
           userEmail={authedEmail}
         />
       )}
+
+      {/* Settings Saved Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbarOpen(false)} 
+          severity="success" 
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          Settings Saved
+        </Alert>
+      </Snackbar>
     </>
   );
 }
