@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
@@ -13,11 +13,15 @@ import {
   Typography,
   Alert,
   IconButton,
+  Divider,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import SaveIcon from "@mui/icons-material/Save";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
+import NotificationsIcon from "@mui/icons-material/Notifications";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { ProfileRow } from "@/types";
@@ -27,7 +31,7 @@ const normEmail = (s: string) => s.trim().toLowerCase();
 
 export default function ProfilePage() {
   const router = useRouter();
-  const members = getMembers().map((m) => ({ ...m, email: normEmail(m.email) }));
+  const members = useMemo(() => getMembers().map((m) => ({ ...m, email: normEmail(m.email) })), []);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,6 +43,12 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
+  
+  // Notification preferences state
+  const [emailOnMention, setEmailOnMention] = useState(true);
+  const [emailOnAllComments, setEmailOnAllComments] = useState(false);
+  const [prefsLoading, setPrefsLoading] = useState(false);
+  const [prefsSaving, setPrefsSaving] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -88,6 +98,23 @@ export default function ProfilePage() {
       }
 
       setLoading(false);
+      
+      // Fetch notification preferences
+      setPrefsLoading(true);
+      try {
+        const prefsResponse = await fetch(`/api/notifications/preferences?userEmail=${email}`);
+        if (prefsResponse.ok) {
+          const prefsData = await prefsResponse.json();
+          if (prefsData.preferences) {
+            setEmailOnMention(prefsData.preferences.email_on_mention);
+            setEmailOnAllComments(prefsData.preferences.email_on_all_comments);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching notification preferences:', err);
+      } finally {
+        setPrefsLoading(false);
+      }
     })();
 
     return () => {
@@ -205,6 +232,34 @@ export default function ProfilePage() {
   async function handleLogout() {
     await supabase.auth.signOut({ scope: "local" });
     router.push("/");
+  }
+
+  async function handleSaveNotificationPrefs() {
+    if (!authedEmail) return;
+    
+    setPrefsSaving(true);
+    try {
+      const response = await fetch('/api/notifications/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: authedEmail,
+          emailOnMention,
+          emailOnAllComments,
+        }),
+      });
+      
+      if (response.ok) {
+        setSuccess('Notification preferences saved!');
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Failed to save notification preferences');
+      }
+    } catch (err) {
+      setError('Failed to save notification preferences');
+    } finally {
+      setPrefsSaving(false);
+    }
   }
 
   if (loading) {
@@ -334,6 +389,78 @@ export default function ProfilePage() {
             >
               Log Out
             </Button>
+
+            {/* Notification Settings */}
+            <Divider sx={{ my: 2 }} />
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <NotificationsIcon color="primary" />
+              <Typography variant="h6" fontWeight={600}>
+                Notification Settings
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Control how you receive notifications about comments on Book of the Month.
+            </Typography>
+
+            {prefsLoading ? (
+              <CircularProgress size={24} />
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={emailOnMention}
+                      onChange={(e) => setEmailOnMention(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Email when mentioned
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Get an email when someone @mentions you
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start', ml: 0 }}
+                />
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={emailOnAllComments}
+                      onChange={(e) => setEmailOnAllComments(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        All comments
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Get an email for every new comment
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start', ml: 0 }}
+                />
+
+                <Button
+                  variant="contained"
+                  onClick={handleSaveNotificationPrefs}
+                  disabled={prefsSaving}
+                  size="small"
+                  sx={{ alignSelf: 'flex-start', mt: 1 }}
+                >
+                  {prefsSaving ? 'Saving...' : 'Save Notifications'}
+                </Button>
+              </Box>
+            )}
           </CardContent>
         </Card>
       </Box>
