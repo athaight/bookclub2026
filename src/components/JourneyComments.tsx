@@ -420,13 +420,6 @@ export default function JourneyComments({
     fetchComments();
   }, [fetchComments]);
 
-  // Scroll to bottom when comments change
-  useEffect(() => {
-    if (!loading && comments.length > 0) {
-      scrollToBottom();
-    }
-  }, [comments.length, loading, scrollToBottom]);
-
   // Handle new comment submission
   const handleSubmit = async () => {
     if (!newComment.trim() || !currentUserEmail) return;
