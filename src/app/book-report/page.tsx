@@ -30,6 +30,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers, Member } from "@/lib/members";
 import { BookReportRow, ProfileRow } from "@/types";
@@ -313,13 +314,32 @@ export default function BookReportPage() {
 
   return (
     <>
-      <Box sx={{ textAlign: "center", mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Book Reports
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Deep dives and thoughts on books we found extra juicy
-        </Typography>
+      <Box sx={{ textAlign: "center", mb: 4, overflow: "hidden" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h3" component="h1" gutterBottom>
+            Book Reports
+          </Typography>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Deep dives and thoughts on books we found extra juicy
+          </Typography>
+        </motion.div>
 
         {/* Admin: Show New Report button */}
         {authedEmail && (

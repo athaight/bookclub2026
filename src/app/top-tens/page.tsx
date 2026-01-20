@@ -32,6 +32,7 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import SearchIcon from "@mui/icons-material/Search";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import EditIcon from "@mui/icons-material/Edit";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -1060,13 +1061,32 @@ export default function TopTensPage() {
 
   return (
     <>
-      <Box sx={{ textAlign: "center", mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Top Ten
-        </Typography>
-        <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
-          The books that made our lists
-        </Typography>
+      <Box sx={{ textAlign: "center", mb: 4, overflow: "hidden" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h3" component="h1" gutterBottom>
+            Top Ten
+          </Typography>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
+            The books that made our lists
+          </Typography>
+        </motion.div>
       </Box>
 
       {isMobile ? (

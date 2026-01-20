@@ -43,6 +43,7 @@ import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
 import MemberAvatar from "@/components/MemberAvatar";
 import BookCoverImage from "@/components/BookCoverImage";
+import { motion } from "framer-motion";
 
 type Member = { email: string; name: string };
 
@@ -784,13 +785,32 @@ export default function OurLibrariesPage() {
 
   return (
     <>
-      <Box sx={{ textAlign: "center", mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Libraries
-        </Typography>
-        <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
-          A collection of all the books we&apos;ve ever read.
-        </Typography>
+      <Box sx={{ textAlign: "center", mb: 4, overflow: "hidden" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h3" component="h1" gutterBottom>
+            Libraries
+          </Typography>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="body1" sx={{ maxWidth: 700, mx: "auto", color: "text.secondary" }}>
+            A collection of all the books we&apos;ve ever read.
+          </Typography>
+        </motion.div>
       </Box>
 
       {err && (

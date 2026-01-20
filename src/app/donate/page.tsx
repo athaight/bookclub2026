@@ -1,17 +1,37 @@
 "use client";
 
 import { Typography, Box, Button, Card, CardContent, CardMedia } from "@mui/material";
+import { motion } from "framer-motion";
 
 export default function DonatePage() {
   return (
     <>
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Help keep the pages turning.
-        </Typography>
-        <Typography variant="h5" component="p" sx={{ mb: 2 }}>
-           Good books, good conversations, and shared curiosity. If you’d like to support the club, donations help us keep it going. Give via Cash App using the link below or the QR code.
-        </Typography>
+      <Box sx={{ textAlign: 'center', mb: 4, overflow: 'hidden' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h3" component="h1" gutterBottom>
+            Help keep the pages turning.
+          </Typography>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h5" component="p" sx={{ mb: 2 }}>
+             Good books, good conversations, and shared curiosity. If you'd like to support the club, donations help us keep it going. Give via Cash App using the link below or the QR code.
+          </Typography>
+        </motion.div>
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>

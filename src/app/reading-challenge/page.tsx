@@ -35,6 +35,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import SearchIcon from "@mui/icons-material/Search";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -887,18 +888,52 @@ export default function HomePage() {
 
   return (
     <>
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Reading Challenge
-        </Typography>
-        <Typography variant="h5" sx={{ mb: 2, color: 'text.secondary' }}>
-          The <strong>2026</strong> challenge is: Who can read the most books?
-        </Typography>
-        <Box sx={{ maxWidth: 500, mx: 'auto', textAlign: 'center' }}>
-          <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
-            🏆 1st place: <strong>Bibliophile</strong> | 2nd: <strong>Bookworm</strong> | 3rd: <strong>Bookish</strong>
+      <Box sx={{ textAlign: 'center', mb: 4, overflow: 'hidden' }}>
+        {/* Reading Challenge title - slow up and in */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h3" component="h1" gutterBottom>
+            Reading Challenge
           </Typography>
-        </Box>
+        </motion.div>
+
+        {/* 2026 challenge description - fade up and in */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Typography variant="h5" sx={{ mb: 2, color: 'text.secondary' }}>
+            The <strong>2026</strong> challenge is: Who can read the most books?
+          </Typography>
+        </motion.div>
+
+        {/* Prize tiers - staggered fade in */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.8,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          <Box sx={{ maxWidth: 500, mx: 'auto', textAlign: 'center' }}>
+            <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
+              🏆 1st place: <strong>Bibliophile</strong> | 2nd: <strong>Bookworm</strong> | 3rd: <strong>Bookish</strong>
+            </Typography>
+          </Box>
+        </motion.div>
       </Box>
 
       {err && (

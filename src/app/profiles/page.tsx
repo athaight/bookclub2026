@@ -51,6 +51,7 @@ import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import BookCoverImage from "@/components/BookCoverImage";
 import RecommendBookModal from "@/components/RecommendBookModal";
 import BookDiscoveryModal from "@/components/BookDiscoveryModal";
+import { motion } from "framer-motion";
 
 type Member = { email: string; name: string };
 
@@ -651,25 +652,34 @@ export default function ProfilesPage() {
   }, [selectedMember, memberBooks, members]);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Page Title */}
-      <Typography
-        variant="h3"
-        component="h1"
-        align="center"
-        sx={{
-          fontWeight: 700,
-          mb: 4,
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          backgroundClip: "text",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
+    <Container maxWidth="lg" sx={{ py: 4, overflow: "hidden" }}>
+      {/* Page Title - animated */}
+      <motion.div
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: 1.2,
+          ease: [0.16, 1, 0.3, 1],
         }}
       >
-        Meet the Book Bros
-      </Typography>
+        <Typography
+          variant="h3"
+          component="h1"
+          align="center"
+          sx={{
+            fontWeight: 700,
+            mb: 4,
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Meet the Book Bros
+        </Typography>
+      </motion.div>
 
-      {/* Three Members Inline */}
+      {/* Three Members Inline - zoom in animation */}
       <Box
         sx={{
           display: "flex",
@@ -680,68 +690,88 @@ export default function ProfilesPage() {
           mb: 4,
         }}
       >
-        {members.map((m) => {
+        {members.map((m, index) => {
           const profile = profiles[m.email];
           const avatarUrl = profile?.avatar_url;
           const isSelected = selectedMember?.email === m.email;
 
           return (
-            <Box
+            <motion.div
               key={m.email}
-              onClick={() => setSelectedMember(m)}
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                cursor: "pointer",
-                transition: "transform 0.2s ease, opacity 0.2s ease",
-                opacity: selectedMember && !isSelected ? 0.5 : 1,
-                "&:hover": {
-                  transform: "scale(1.05)",
-                },
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{
+                duration: 0.6,
+                delay: 0.5 + index * 0.15,
+                ease: [0.16, 1, 0.3, 1],
               }}
             >
-              <Avatar
-                src={avatarUrl || undefined}
-                alt={`Profile picture of ${m.name}`}
+              <Box
+                onClick={() => setSelectedMember(m)}
                 sx={{
-                  width: { xs: 80, sm: 100, md: 120 },
-                  height: { xs: 80, sm: 100, md: 120 },
-                  fontSize: { xs: 28, sm: 36, md: 44 },
-                  border: isSelected ? "4px solid #667eea" : "4px solid transparent",
-                  boxShadow: isSelected
-                    ? "0 8px 32px rgba(102, 126, 234, 0.4)"
-                    : "0 4px 16px rgba(0,0,0,0.1)",
-                  transition: "all 0.2s ease",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  cursor: "pointer",
+                  transition: "transform 0.2s ease, opacity 0.2s ease",
+                  opacity: selectedMember && !isSelected ? 0.5 : 1,
+                  "&:hover": {
+                    transform: "scale(1.05)",
+                  },
                 }}
               >
-                {!avatarUrl && getInitials(m.name)}
-              </Avatar>
-              <Typography
-                variant="h6"
-                component="h2"
-                sx={{
-                  mt: 1.5,
-                  fontWeight: 600,
-                  color: isSelected ? "primary.main" : "text.primary",
-                }}
-              >
-                {getFirstName(m.name)}
-              </Typography>
-            </Box>
+                <Avatar
+                  src={avatarUrl || undefined}
+                  alt={`Profile picture of ${m.name}`}
+                  sx={{
+                    width: { xs: 80, sm: 100, md: 120 },
+                    height: { xs: 80, sm: 100, md: 120 },
+                    fontSize: { xs: 28, sm: 36, md: 44 },
+                    border: isSelected ? "4px solid #667eea" : "4px solid transparent",
+                    boxShadow: isSelected
+                      ? "0 8px 32px rgba(102, 126, 234, 0.4)"
+                      : "0 4px 16px rgba(0,0,0,0.1)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {!avatarUrl && getInitials(m.name)}
+                </Avatar>
+                <Typography
+                  variant="h6"
+                  component="h2"
+                  sx={{
+                    mt: 1.5,
+                    fontWeight: 600,
+                    color: isSelected ? "primary.main" : "text.primary",
+                  }}
+                >
+                  {getFirstName(m.name)}
+                </Typography>
+              </Box>
+            </motion.div>
           );
         })}
       </Box>
 
-      {/* Instructions Header */}
+      {/* Instructions Header - slide up from bottom */}
       {!selectedMember && (
-        <Typography
-          variant="h6"
-          align="center"
-          sx={{ color: "text.secondary", mt: 4 }}
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.8,
+            delay: 1.0,
+            ease: [0.16, 1, 0.3, 1],
+          }}
         >
-          Click a member to see their dashboard
-        </Typography>
+          <Typography
+            variant="h6"
+            align="center"
+            sx={{ color: "text.secondary", mt: 4 }}
+          >
+            Click a member to see their dashboard
+          </Typography>
+        </motion.div>
       )}
 
       {/* Dashboard Content */}
