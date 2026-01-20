@@ -271,12 +271,35 @@ export default function OurLibrariesPage() {
       member_email: normEmail(r.member_email),
     }));
 
+    // Deduplicate library books by member + title + author (keep most recently updated)
+    const dedupedLibrary = normalizedLibrary.reduce<BookRow[]>((acc, book) => {
+      const key = `${book.member_email}|${(book.title ?? '').toLowerCase().trim()}|${(book.author ?? '').toLowerCase().trim()}`;
+      const existingIdx = acc.findIndex(b => 
+        b.member_email === book.member_email &&
+        (b.title ?? '').toLowerCase().trim() === (book.title ?? '').toLowerCase().trim() &&
+        (b.author ?? '').toLowerCase().trim() === (book.author ?? '').toLowerCase().trim()
+      );
+      if (existingIdx >= 0) {
+        // Keep the one with the most recent updated_at, or the one with a rating/comment
+        const existing = acc[existingIdx];
+        const existingDate = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+        const bookDate = book.updated_at ? new Date(book.updated_at).getTime() : 0;
+        const bookHasMoreData = (book.rating || book.comment) && !(existing.rating || existing.comment);
+        if (bookDate > existingDate || bookHasMoreData) {
+          acc[existingIdx] = book;
+        }
+      } else {
+        acc.push(book);
+      }
+      return acc;
+    }, []);
+
     const normalizedTopTen = ((topTenResult.data ?? []) as BookRow[]).map((r) => ({
       ...r,
       member_email: normEmail(r.member_email),
     }));
 
-    setLibraryBooks(normalizedLibrary);
+    setLibraryBooks(dedupedLibrary);
     setTopTenBooks(normalizedTopTen);
     setLoading(false);
   }
