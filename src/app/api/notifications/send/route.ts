@@ -56,7 +56,7 @@ function generateEmailHtml({
   commentId: string;
   type: 'mention' | 'new_comment';
 }): string {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://bookbros.vercel.app';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://bookbrosbookclub.com';
   const commentLink = `${baseUrl}/book-of-the-month?comment=${commentId}`;
   
   const headerText = type === 'mention' 
@@ -158,10 +158,10 @@ export async function POST(request: NextRequest) {
       bookOfMonthId,
     } = body;
 
-    // Don't send email to yourself
-    if (recipientEmail.toLowerCase() === commenterEmail.toLowerCase()) {
-      return NextResponse.json({ success: true, skipped: 'self' });
-    }
+    // Don't send email to yourself (TEMPORARILY DISABLED FOR TESTING)
+    // if (recipientEmail.toLowerCase() === commenterEmail.toLowerCase()) {
+    //   return NextResponse.json({ success: true, skipped: 'self' });
+    // }
 
     // Check notification preferences
     const { data: prefs } = await supabaseAdmin
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     // Send the email
     const { data, error } = await resendClient.emails.send({
-      from: 'Book Bros <notifications@bookbros.app>', // You'll need to verify this domain in Resend
+      from: 'Book Bros <onboarding@resend.dev>', // Using Resend test domain - replace with verified domain for production
       to: recipientEmail,
       subject: type === 'mention' 
         ? `${commenterName} mentioned you in Book Bros! 📚`
