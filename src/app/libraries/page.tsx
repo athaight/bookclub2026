@@ -35,6 +35,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -43,6 +44,7 @@ import { searchBooks, BookSearchResult } from "@/lib/bookSearch";
 import StarRating from "@/components/StarRating";
 import MemberAvatar from "@/components/MemberAvatar";
 import BookCoverImage from "@/components/BookCoverImage";
+import BookChatModal from "@/components/BookChatModal";
 import { motion } from "framer-motion";
 
 type Member = { email: string; name: string };
@@ -55,6 +57,7 @@ function LibraryBookCard({
   onDelete,
   onEdit,
   onAdd,
+  onChat,
   canAdd,
 }: {
   row: BookRow;
@@ -62,6 +65,7 @@ function LibraryBookCard({
   onDelete?: (row: BookRow) => void;
   onEdit?: (row: BookRow) => void;
   onAdd?: (row: BookRow) => void;
+  onChat?: (row: BookRow) => void;
   canAdd?: boolean;
 }) {
   return (
@@ -87,6 +91,19 @@ function LibraryBookCard({
               <Typography variant="body2" sx={{ mt: 0.5, fontStyle: "italic", color: "text.secondary" }}>
                 {row.comment}
               </Typography>
+            )}
+            {/* Chat icon */}
+            {onChat && (
+              <IconButton
+                aria-label="chat about this book"
+                onClick={() => onChat(row)}
+                size="small"
+                color="primary"
+                title="Chat about this book"
+                sx={{ mt: 0.5, ml: -0.5 }}
+              >
+                <ChatBubbleOutlineIcon fontSize="small" />
+              </IconButton>
             )}
           </Box>
 
@@ -187,6 +204,10 @@ export default function OurLibrariesPage() {
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
   const [bookToAdd, setBookToAdd] = useState<BookRow | null>(null);
   const [addingBook, setAddingBook] = useState(false);
+
+  // Book chat modal state
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatBook, setChatBook] = useState<BookRow | null>(null);
 
   useEffect(() => {
     const init: Record<string, boolean> = {};
@@ -340,6 +361,12 @@ export default function OurLibrariesPage() {
   function handleAddToListClick(book: BookRow) {
     setBookToAdd(book);
     setAddToListDialogOpen(true);
+  }
+
+  // Handle clicking chat button on a book
+  function handleChatClick(book: BookRow) {
+    setChatBook(book);
+    setChatModalOpen(true);
   }
 
   // Add book to library or wishlist
@@ -730,6 +757,7 @@ export default function OurLibrariesPage() {
               onDelete={handleDeleteClick}
               onEdit={handleEditClick}
               onAdd={handleAddToListClick}
+              onChat={handleChatClick}
               canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
             />
           ))
@@ -770,6 +798,7 @@ export default function OurLibrariesPage() {
               onDelete={handleDeleteClick}
               onEdit={handleEditClick}
               onAdd={handleAddToListClick}
+              onChat={handleChatClick}
               canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
             />
           ))
@@ -1194,6 +1223,24 @@ export default function OurLibrariesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Book Chat Modal */}
+      <BookChatModal
+        open={chatModalOpen}
+        onClose={() => {
+          setChatModalOpen(false);
+          setChatBook(null);
+        }}
+        book={chatBook ? {
+          title: chatBook.title || "",
+          author: chatBook.author,
+          coverUrl: chatBook.cover_url,
+        } : null}
+        currentUserEmail={authedEmail}
+        profiles={profiles}
+        members={members}
+        readOnly={!authedEmail}
+      />
     </>
   );
 }
