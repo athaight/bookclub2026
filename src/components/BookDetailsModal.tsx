@@ -11,6 +11,7 @@ import {
   Avatar,
   CircularProgress,
   Chip,
+  Rating,
 } from "@mui/material";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import { getBookDetails, BookDetails, BookSearchResult } from "@/lib/bookSearch";
@@ -180,8 +181,24 @@ export default function BookDetailsModal({ open, onClose, book }: BookDetailsMod
                 size="small"
                 color="primary"
                 variant="outlined"
-                sx={{ mb: 2 }}
+                sx={{ mb: 1 }}
               />
+            )}
+
+            {/* Rating from API */}
+            {details?.rating && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                <Rating
+                  value={details.rating}
+                  precision={0.1}
+                  readOnly
+                  size="small"
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {details.rating.toFixed(1)}
+                  {details.ratingsCount && ` (${details.ratingsCount.toLocaleString()} ratings)`}
+                </Typography>
+              </Box>
             )}
 
             {loading ? (

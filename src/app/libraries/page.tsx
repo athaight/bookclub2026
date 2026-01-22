@@ -36,6 +36,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import ChatBubbleIcon from "@mui/icons-material/ChatBubble";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
 import { useProfiles } from "@/lib/useProfiles";
@@ -59,6 +60,7 @@ function LibraryBookCard({
   onAdd,
   onChat,
   canAdd,
+  hasComments,
 }: {
   row: BookRow;
   isOwner?: boolean;
@@ -67,6 +69,7 @@ function LibraryBookCard({
   onAdd?: (row: BookRow) => void;
   onChat?: (row: BookRow) => void;
   canAdd?: boolean;
+  hasComments?: boolean;
 }) {
   return (
     <Card sx={{ mb: 1 }}>
@@ -92,21 +95,9 @@ function LibraryBookCard({
                 {row.comment}
               </Typography>
             )}
-            {/* Chat icon */}
-            {onChat && (
-              <IconButton
-                aria-label="chat about this book"
-                onClick={() => onChat(row)}
-                size="small"
-                color="primary"
-                title="Chat about this book"
-                sx={{ mt: 0.5, ml: -0.5 }}
-              >
-                <ChatBubbleOutlineIcon fontSize="small" />
-              </IconButton>
-            )}
           </Box>
 
+          {/* Action buttons - right side */}
           {isOwner ? (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               {onEdit && (
@@ -128,19 +119,43 @@ function LibraryBookCard({
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               )}
+              {onChat && (
+                <IconButton
+                  aria-label="chat about this book"
+                  onClick={() => onChat(row)}
+                  size="small"
+                  color="primary"
+                  title={hasComments ? "View chat" : "Start a chat about this book"}
+                >
+                  {hasComments ? <ChatBubbleIcon fontSize="small" /> : <ChatBubbleOutlineIcon fontSize="small" />}
+                </IconButton>
+              )}
             </Box>
           ) : (
-            canAdd && onAdd && (
-              <IconButton
-                aria-label="add to my list"
-                onClick={() => onAdd(row)}
-                size="small"
-                color="primary"
-                title="Add to my list"
-              >
-                <BookmarkBorderIcon fontSize="small" />
-              </IconButton>
-            )
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {canAdd && onAdd && (
+                <IconButton
+                  aria-label="add to my list"
+                  onClick={() => onAdd(row)}
+                  size="small"
+                  color="primary"
+                  title="Add to my list"
+                >
+                  <BookmarkBorderIcon fontSize="small" />
+                </IconButton>
+              )}
+              {onChat && (
+                <IconButton
+                  aria-label="chat about this book"
+                  onClick={() => onChat(row)}
+                  size="small"
+                  color="primary"
+                  title={hasComments ? "View chat" : "Start a chat about this book"}
+                >
+                  {hasComments ? <ChatBubbleIcon fontSize="small" /> : <ChatBubbleOutlineIcon fontSize="small" />}
+                </IconButton>
+              )}
+            </Box>
           )}
         </Box>
       </CardContent>
@@ -209,11 +224,14 @@ export default function OurLibrariesPage() {
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatBook, setChatBook] = useState<BookRow | null>(null);
 
+  // Track which books have comments (set of book identifiers)
+  const [booksWithComments, setBooksWithComments] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     const init: Record<string, boolean> = {};
     for (const m of members) init[m.email] = true;
     setExpanded(init);
-  }, [members]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -323,6 +341,29 @@ export default function OurLibrariesPage() {
     setLibraryBooks(dedupedLibrary);
     setTopTenBooks(normalizedTopTen);
     setLoading(false);
+
+    // Fetch which books have comments
+    fetchBooksWithComments();
+  }
+
+  // Fetch all unique book identifiers that have at least one comment
+  async function fetchBooksWithComments() {
+    try {
+      const { data, error } = await supabase
+        .from("book_comments")
+        .select("book_identifier");
+      
+      if (error) {
+        console.warn("Failed to fetch books with comments:", error);
+        return;
+      }
+
+      // Create a set of unique book identifiers
+      const identifiers = new Set<string>((data || []).map((c: { book_identifier: string }) => c.book_identifier));
+      setBooksWithComments(identifiers);
+    } catch (err) {
+      console.warn("Error fetching books with comments:", err);
+    }
   }
 
   useEffect(() => {
@@ -355,6 +396,12 @@ export default function OurLibrariesPage() {
         (b.title || "").toLowerCase().trim() === normTitle &&
         (b.author || "").toLowerCase().trim() === normAuthor
     );
+  }
+
+  // Check if a book has comments
+  function bookHasComments(title: string, author: string): boolean {
+    const bookIdentifier = `${title.trim().toLowerCase()}::${(author || "").trim().toLowerCase()}`;
+    return booksWithComments.has(bookIdentifier);
   }
 
   // Handle clicking add button on another user's book
@@ -759,6 +806,7 @@ export default function OurLibrariesPage() {
               onAdd={handleAddToListClick}
               onChat={handleChatClick}
               canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
+              hasComments={bookHasComments(book.title || "", book.author || "")}
             />
           ))
         ) : (
@@ -800,6 +848,7 @@ export default function OurLibrariesPage() {
               onAdd={handleAddToListClick}
               onChat={handleChatClick}
               canAdd={!!authedEmail && !isOwner && !userHasBook(book.title || "", book.author || "")}
+              hasComments={bookHasComments(book.title || "", book.author || "")}
             />
           ))
         ) : (

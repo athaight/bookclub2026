@@ -26,6 +26,7 @@ import {
   Typography,
 } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
+import { SparkLineChart } from "@mui/x-charts/SparkLineChart";
 import { PieChart } from "@mui/x-charts/PieChart";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
@@ -637,13 +638,25 @@ export default function ProfilesPage() {
     // Wishlist books
     const wishlistBooks = books.filter((b) => b.status === "wishlist");
 
+    // Calculate total pages read from completed challenge books
+    const pagesRead = completedChallengeBooks.reduce((total, book) => {
+      return total + (book.pages || 0);
+    }, 0);
+
+    // Calculate total pages in library
+    const totalLibraryPages = libraryBooks.reduce((total, book) => {
+      return total + (book.pages || 0);
+    }, 0);
+
     return {
       currentBooks,
       booksRead: completedChallengeBooks.length,
+      pagesRead,
       rankNumber,
       rankLabel,
       monthlyData,
       totalLibraryBooks: libraryBooks.length,
+      totalLibraryPages,
       libraryBooks,
       topTenBooks,
       genres: sortedGenres,
@@ -887,8 +900,8 @@ export default function ProfilesPage() {
             }}
           >
             {/* Reading Challenge Progress */}
-            <Card>
-              <CardContent>
+            <Card sx={{ display: "flex", flexDirection: "column" }}>
+              <CardContent sx={{ display: "flex", flexDirection: "column", flex: 1 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                   <MenuBookIcon color="primary" />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -900,10 +913,10 @@ export default function ProfilesPage() {
                 <Box sx={{ mb: 2 }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Progress
+                      Books
                     </Typography>
                     <Typography variant="body2" fontWeight={600}>
-                      {stats.booksRead} / 26 books
+                      {stats.booksRead} / 26
                     </Typography>
                   </Box>
                   <Box
@@ -926,30 +939,138 @@ export default function ProfilesPage() {
                   </Box>
                 </Box>
 
+                {/* Pages Read Progress Bar */}
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Pages
+                    </Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {stats.pagesRead.toLocaleString()}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: "grey.200",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        height: "100%",
+                        width: `${Math.min((stats.pagesRead / 7800) * 100, 100)}%`,
+                        background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                        borderRadius: 4,
+                        transition: "width 0.5s ease",
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Spacer to push chart to bottom */}
+                <Box sx={{ flex: 1 }} />
+
                 {/* Monthly Chart */}
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                   Books by Month
                 </Typography>
-                <Box sx={{ width: "100%", height: 180, px: 3, boxSizing: "border-box" }}>
-                  <Box sx={{ width: "100%" }}>
-                    <BarChart
-                      xAxis={[
-                        {
-                          scaleType: "band",
-                          data: ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"],
-                        },
-                      ]}
-                      series={[
-                        {
-                          data: stats.monthlyData,
-                          color: "#667eea",
-                        },
-                      ]}
-                      height={180}
-                      margin={{ top: 10, bottom: 25, left: 0, right: 0 }}
+                <Box sx={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <Box sx={{ width: "100%", height: 100 }}>
+                    <SparkLineChart
+                      data={stats.monthlyData}
+                      plotType="bar"
+                      height={100}
+                      showTooltip
+                      showHighlight
+                      xAxis={{
+                        scaleType: "band",
+                        data: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+                      }}
+                      color="#667eea"
                     />
                   </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%", mt: 0.5, px: 0.5 }}>
+                    {["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"].map((m, index) => (
+                      <Typography key={index} variant="caption" color="text.secondary" sx={{ fontSize: "10px", flex: 1, textAlign: "center" }}>
+                        {m}
+                      </Typography>
+                    ))}
+                  </Box>
                 </Box>
+              </CardContent>
+            </Card>
+
+            {/* Genre Distribution */}
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <LibraryBooksIcon color="secondary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Genre Distribution
+                  </Typography>
+                </Box>
+
+                {stats.genres.length > 0 ? (
+                  (() => {
+                    const genreColors = [
+                      "#02b2af", "#2e96ff", "#b800d8", "#60009b", "#2731c8",
+                      "#03008d", "#ff6f00", "#4caf50", "#f44336", "#9c27b0"
+                    ];
+                    
+                    return (
+                      <>
+                        <Box sx={{ width: "100%", height: 180, display: "flex", justifyContent: "center" }}>
+                          <PieChart
+                            series={[
+                              {
+                                data: stats.genres.map(([genre, count], index) => ({
+                                  id: index,
+                                  value: count,
+                                  color: genreColors[index % genreColors.length],
+                                })),
+                                innerRadius: 20,
+                                outerRadius: 70,
+                                paddingAngle: 2,
+                                cornerRadius: 4,
+                              },
+                            ]}
+                            width={180}
+                            height={180}
+                          />
+                        </Box>
+                        
+                        <Box 
+                          sx={{ 
+                            display: "flex", 
+                            flexWrap: "wrap", 
+                            gap: 0.5,
+                            justifyContent: "center",
+                            mt: 2,
+                          }}
+                        >
+                          {stats.genres.map(([genre, count], index) => (
+                            <Chip
+                              key={genre}
+                              label={`${genre} (${count})`}
+                              size="small"
+                              sx={{
+                                bgcolor: genreColors[index % genreColors.length],
+                                color: "white",
+                                fontSize: 11,
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                    No genre data available yet
+                  </Typography>
+                )}
               </CardContent>
             </Card>
 
@@ -1007,17 +1128,7 @@ export default function ProfilesPage() {
                 </Link>
               </CardContent>
             </Card>
-          </Box>
 
-          {/* Second Row - Wishlist and Genre Stats */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-              gap: 3,
-              mb: 3,
-            }}
-          >
             {/* Wishlist */}
             <Card>
               <CardContent>
@@ -1137,78 +1248,6 @@ export default function ProfilesPage() {
                 ) : (
                   <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
                     No books on wishlist
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Genre Distribution */}
-            <Card>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                  <LibraryBooksIcon color="secondary" />
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Genre Distribution
-                  </Typography>
-                </Box>
-
-                {stats.genres.length > 0 ? (
-                  (() => {
-                    const genreColors = [
-                      "#02b2af", "#2e96ff", "#b800d8", "#60009b", "#2731c8",
-                      "#03008d", "#ff6f00", "#4caf50", "#f44336", "#9c27b0"
-                    ];
-                    
-                    return (
-                      <>
-                        <Box sx={{ width: "100%", height: 180, display: "flex", justifyContent: "center" }}>
-                          <PieChart
-                            series={[
-                              {
-                                data: stats.genres.map(([genre, count], index) => ({
-                                  id: index,
-                                  value: count,
-                                  color: genreColors[index % genreColors.length],
-                                })),
-                                innerRadius: 20,
-                                outerRadius: 70,
-                                paddingAngle: 2,
-                                cornerRadius: 4,
-                              },
-                            ]}
-                            width={180}
-                            height={180}
-                          />
-                        </Box>
-                        
-                        <Box 
-                          sx={{ 
-                            display: "flex", 
-                            flexWrap: "wrap", 
-                            gap: 0.5,
-                            justifyContent: "center",
-                            mt: 2,
-                          }}
-                        >
-                          {stats.genres.map(([genre, count], index) => (
-                            <Chip
-                              key={genre}
-                              label={`${genre} (${count})`}
-                              size="small"
-                              sx={{
-                                bgcolor: genreColors[index % genreColors.length],
-                                color: "white",
-                                fontSize: 11,
-                              }}
-                            />
-                          ))}
-                        </Box>
-                      </>
-                    );
-                  })()
-                ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
-                    No genre data available yet
                   </Typography>
                 )}
               </CardContent>
@@ -1373,6 +1412,37 @@ export default function ProfilesPage() {
                     </Box>
                   ))}
                 </Box>
+
+                {/* Total Library Pages */}
+                {stats.totalLibraryPages > 0 && (
+                  <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Total Pages Read
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {stats.totalLibraryPages.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        height: 8,
+                        borderRadius: 4,
+                        bgcolor: "grey.200",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          height: "100%",
+                          width: "100%",
+                          background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                          borderRadius: 4,
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           )}

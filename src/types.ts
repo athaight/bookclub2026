@@ -14,6 +14,7 @@ export type BookRow = {
   reading_challenge_year?: number | null; // Year the book was added for reading challenge
   rating?: number | null; // 1-5 star rating
   genre?: string | null; // Primary genre/subject from book API
+  pages?: number | null; // Number of pages in the book
 };
 
 export type ProfileRow = {

@@ -7,6 +7,9 @@ export interface BookSearchResult {
   isbn?: string;
   key?: string;
   genre?: string; // Primary genre/subject
+  pages?: number; // Number of pages
+  rating?: number; // Average rating (0-5 scale)
+  ratingsCount?: number; // Number of ratings
 }
 
 // Normalize and pick the best genre from a list of subjects
@@ -99,7 +102,7 @@ export async function searchBooks(query: string, options?: { limit?: number; off
     if (isAuthorSearch) {
       // Search by author - fetch more results for prolific authors
       const authorResponse = await fetch(
-        `https://openlibrary.org/search.json?author=${encodeURIComponent(query)}&limit=${fetchLimit}&offset=${offset}&fields=title,author_name,author_alternative_name,cover_i,isbn,key,subject,first_publish_year&sort=editions`
+        `https://openlibrary.org/search.json?author=${encodeURIComponent(query)}&limit=${fetchLimit}&offset=${offset}&fields=title,author_name,author_alternative_name,cover_i,isbn,key,subject,first_publish_year,number_of_pages_median,ratings_average,ratings_count&sort=editions`
       );
       
       if (authorResponse.ok) {
@@ -112,6 +115,9 @@ export async function searchBooks(query: string, options?: { limit?: number; off
           isbn: doc.isbn?.[0],
           key: doc.key,
           genre: pickBestGenre(doc.subject),
+          pages: doc.number_of_pages_median || undefined,
+          rating: doc.ratings_average || undefined,
+          ratingsCount: doc.ratings_count || undefined,
         }));
       }
     }
@@ -119,7 +125,7 @@ export async function searchBooks(query: string, options?: { limit?: number; off
     // If not author search or author search returned few results, do general search
     if (!isAuthorSearch || results.length < 5) {
       const response = await fetch(
-        `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=${fetchLimit}&offset=${offset}&fields=title,author_name,author_alternative_name,cover_i,isbn,key,subject,first_publish_year`
+        `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=${fetchLimit}&offset=${offset}&fields=title,author_name,author_alternative_name,cover_i,isbn,key,subject,first_publish_year,number_of_pages_median,ratings_average,ratings_count`
       );
 
       if (response.ok) {
@@ -134,6 +140,9 @@ export async function searchBooks(query: string, options?: { limit?: number; off
           isbn: doc.isbn?.[0],
           key: doc.key,
           genre: pickBestGenre(doc.subject),
+          pages: doc.number_of_pages_median || undefined,
+          rating: doc.ratings_average || undefined,
+          ratingsCount: doc.ratings_count || undefined,
         }));
         
         // Merge results, preferring author search results if available
@@ -181,6 +190,9 @@ export async function searchBooks(query: string, options?: { limit?: number; off
         coverUrl: item.volumeInfo.imageLinks?.thumbnail,
         isbn: item.volumeInfo.industryIdentifiers?.find((id: any) => id.type === 'ISBN_13')?.identifier,
         genre: pickBestGenre(item.volumeInfo.categories),
+        pages: item.volumeInfo.pageCount || undefined,
+        rating: item.volumeInfo.averageRating || undefined,
+        ratingsCount: item.volumeInfo.ratingsCount || undefined,
       }));
       
       const dedupedResults = deduplicateBooks(results).slice(0, limit);
@@ -199,10 +211,38 @@ export interface BookDetails extends BookSearchResult {
 // Fetch detailed book info including summary from Open Library
 export async function getBookDetails(book: BookSearchResult): Promise<BookDetails> {
   try {
+    let workKey = book.key;
+    
+    // If we don't have a key, search for the book to get one
+    if (!workKey) {
+      try {
+        const searchQuery = `${book.title} ${book.author || ''}`.trim();
+        const searchResponse = await fetch(
+          `https://openlibrary.org/search.json?q=${encodeURIComponent(searchQuery)}&limit=1&fields=key,title,author_name,ratings_average,ratings_count`
+        );
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          if (searchData.docs?.[0]) {
+            workKey = searchData.docs[0].key;
+            // Also grab ratings from search if available
+            if (searchData.docs[0].ratings_average) {
+              book = {
+                ...book,
+                rating: searchData.docs[0].ratings_average,
+                ratingsCount: searchData.docs[0].ratings_count,
+              };
+            }
+          }
+        }
+      } catch {
+        // Ignore search errors, will try Google Books fallback
+      }
+    }
+    
     // If we have a key from Open Library, use it to get the work details
-    if (book.key) {
+    if (workKey) {
       // The key is like "/works/OL123W" - we need to fetch that endpoint
-      const workResponse = await fetch(`https://openlibrary.org${book.key}.json`);
+      const workResponse = await fetch(`https://openlibrary.org${workKey}.json`);
       
       if (workResponse.ok) {
         const workData = await workResponse.json();
@@ -218,10 +258,28 @@ export async function getBookDetails(book: BookSearchResult): Promise<BookDetail
         // Get genre from subjects if not already present
         const genre = book.genre || pickBestGenre(workData.subjects);
         
+        // Fetch ratings if not already present
+        let rating = book.rating;
+        let ratingsCount = book.ratingsCount;
+        if (!rating && workKey) {
+          try {
+            const ratingsResponse = await fetch(`https://openlibrary.org${workKey}/ratings.json`);
+            if (ratingsResponse.ok) {
+              const ratingsData = await ratingsResponse.json();
+              rating = ratingsData.summary?.average || undefined;
+              ratingsCount = ratingsData.summary?.count || undefined;
+            }
+          } catch {
+            // Ignore ratings fetch errors
+          }
+        }
+        
         return {
           ...book,
           summary,
           genre,
+          rating,
+          ratingsCount,
         };
       }
     }
@@ -244,6 +302,8 @@ export async function getBookDetails(book: BookSearchResult): Promise<BookDetail
           ...book,
           summary: item.volumeInfo.description,
           genre: book.genre || pickBestGenre(item.volumeInfo.categories),
+          rating: book.rating || item.volumeInfo.averageRating || undefined,
+          ratingsCount: book.ratingsCount || item.volumeInfo.ratingsCount || undefined,
         };
       }
     }

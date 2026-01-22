@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Box,
   Divider,
@@ -27,6 +28,7 @@ const navItems = [
 
 export default function MobileNav() {
   const isMobile = useMediaQuery("(max-width:1199px)");
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   if (!isMobile) return null;
@@ -45,16 +47,26 @@ export default function MobileNav() {
       <Drawer open={open} onClose={() => setOpen(false)} aria-label="Main navigation menu">
         <Box sx={{ width: 260, height: "100%", display: "flex", flexDirection: "column" }}>
           <List sx={{ flex: 1 }}>
-            {navItems.map((item) => (
-              <ListItemButton
-                key={item.href}
-                component={Link}
-                href={item.href}
-                onClick={() => setOpen(false)}
-              >
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            ))}
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <ListItemButton
+                  key={item.href}
+                  component={Link}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  selected={isActive}
+                  sx={{
+                    fontWeight: isActive ? 700 : 400,
+                    "& .MuiListItemText-primary": {
+                      fontWeight: isActive ? 700 : 400,
+                    },
+                  }}
+                >
+                  <ListItemText primary={item.label} />
+                </ListItemButton>
+              );
+            })}
           </List>
 
           <Divider />
