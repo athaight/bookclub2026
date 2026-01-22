@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googleapis.com https://books.google.com https://openlibrary.org https://covers.openlibrary.org",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googleapis.com https://books.google.com https://openlibrary.org https://covers.openlibrary.org https://api.nytimes.com",
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",

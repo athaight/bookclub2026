@@ -203,156 +203,205 @@ export async function searchBooks(query: string, options?: { limit?: number; off
   }
 }
 
+// Individual rating source
+export interface RatingSource {
+  source: 'openLibrary' | 'googleBooks' | 'nyTimes' | 'bookBros';
+  rating?: number; // 0-5 scale
+  ratingsCount?: number;
+  label: string;
+  url?: string; // Link to the rating source
+}
+
 // Extended book details including summary/description
 export interface BookDetails extends BookSearchResult {
   summary?: string;
+  ratingsSources?: RatingSource[]; // Individual ratings from each source
+  nytReviewUrl?: string; // NY Times review link if available
 }
 
 // Fetch detailed book info including summary from Open Library
 export async function getBookDetails(book: BookSearchResult): Promise<BookDetails> {
+  const ratingsSources: RatingSource[] = [];
+  let result: BookDetails = { ...book };
+  
+  const searchQuery = `${book.title} ${book.author || ''}`.trim();
+  let workKey = book.key;
+  
+  // Temporary storage for data from each source (to merge after parallel fetch)
+  let openLibrarySummary: string | undefined;
+  let openLibraryGenre: string | undefined;
+  let googleBooksSummary: string | undefined;
+  let googleBooksGenre: string | undefined;
+  let googleBooksPages: number | undefined;
+  let nytSummary: string | undefined;
+  
+  // Helper to safely fetch with timeout
+  const fetchWithTimeout = async (url: string, timeoutMs: number = 5000): Promise<Response | null> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch {
+      clearTimeout(timeoutId);
+      return null;
+    }
+  };
+
   try {
-    let workKey = book.key;
-    
-    // If we don't have a key, search for the book to get one
-    if (!workKey) {
-      try {
-        const searchQuery = `${book.title} ${book.author || ''}`.trim();
-        const searchResponse = await fetch(
-          `https://openlibrary.org/search.json?q=${encodeURIComponent(searchQuery)}&limit=1&fields=key,title,author_name,ratings_average,ratings_count`
-        );
-        if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
-          if (searchData.docs?.[0]) {
-            workKey = searchData.docs[0].key;
-            // Also grab ratings from search if available
-            if (searchData.docs[0].ratings_average) {
-              book = {
-                ...book,
-                rating: searchData.docs[0].ratings_average,
-                ratingsCount: searchData.docs[0].ratings_count,
-              };
-            }
-          }
-        }
-      } catch {
-        // Ignore search errors, will try Google Books fallback
-      }
-    }
-    
-    // If we have a key from Open Library, use it to get the work details
-    if (workKey) {
-      // The key is like "/works/OL123W" - we need to fetch that endpoint
-      const workResponse = await fetch(`https://openlibrary.org${workKey}.json`);
-      
-      if (workResponse.ok) {
-        const workData = await workResponse.json();
-        
-        // Description can be a string or an object with "value" property
-        let summary: string | undefined;
-        if (workData.description) {
-          summary = typeof workData.description === 'string' 
-            ? workData.description 
-            : workData.description.value;
-        }
-        
-        // Get genre from subjects if not already present
-        const genre = book.genre || pickBestGenre(workData.subjects);
-        
-        // Fetch ratings if not already present
-        let rating = book.rating;
-        let ratingsCount = book.ratingsCount;
-        if (!rating && workKey) {
-          try {
-            const ratingsResponse = await fetch(`https://openlibrary.org${workKey}/ratings.json`);
-            if (ratingsResponse.ok) {
-              const ratingsData = await ratingsResponse.json();
-              rating = ratingsData.summary?.average || undefined;
-              ratingsCount = ratingsData.summary?.count || undefined;
-            }
-          } catch {
-            // Ignore ratings fetch errors
-          }
-        }
-        
-        return {
-          ...book,
-          summary,
-          genre,
-          rating,
-          ratingsCount,
-        };
-      }
-    }
-    
-    // Fallback chain: Google Books → NY Times
-    let result: BookDetails = { ...book };
-    
-    // Try Google Books API for description and rating
     const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_BOOKS_API_KEY;
-    const searchQuery = `${book.title} ${book.author}`;
+    const nytApiKey = process.env.NEXT_PUBLIC_NYTIMES_API_KEY;
+    
+    // Fetch all sources in parallel
     const googleUrl = googleApiKey
       ? `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=1&key=${googleApiKey}`
       : `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=1`;
     
-    try {
-      const googleResponse = await fetch(googleUrl);
-      
-      if (googleResponse.ok) {
-        const googleData = await googleResponse.json();
-        const item = googleData.items?.[0];
-        
-        if (item?.volumeInfo) {
-          result = {
-            ...result,
-            summary: result.summary || item.volumeInfo.description,
-            genre: result.genre || pickBestGenre(item.volumeInfo.categories),
-            rating: result.rating || item.volumeInfo.averageRating || undefined,
-            ratingsCount: result.ratingsCount || item.volumeInfo.ratingsCount || undefined,
-            pages: result.pages || item.volumeInfo.pageCount || undefined,
-          };
-        }
-      }
-    } catch {
-      // Continue to next fallback
-    }
+    const fetchPromises: Promise<void>[] = [];
     
-    // Try NY Times Books API for review summary (if we still don't have a summary)
-    if (!result.summary) {
-      const nytApiKey = process.env.NEXT_PUBLIC_NYTIMES_API_KEY;
-      if (nytApiKey) {
-        try {
-          // Search for book review by title
-          const nytUrl = `https://api.nytimes.com/svc/books/v3/reviews.json?title=${encodeURIComponent(book.title)}&api-key=${nytApiKey}`;
-          const nytResponse = await fetch(nytUrl);
-          
-          if (nytResponse.ok) {
-            const nytData = await nytResponse.json();
-            const review = nytData.results?.[0];
+    // Google Books
+    fetchPromises.push((async () => {
+      try {
+        const googleResponse = await fetchWithTimeout(googleUrl, 5000);
+        if (googleResponse?.ok) {
+          const googleData = await googleResponse.json();
+          const item = googleData.items?.[0];
+          if (item?.volumeInfo) {
+            googleBooksSummary = item.volumeInfo.description;
+            googleBooksGenre = pickBestGenre(item.volumeInfo.categories);
+            googleBooksPages = item.volumeInfo.pageCount || undefined;
             
-            if (review) {
-              // NY Times provides review summary and sometimes a book description
-              const nytSummary = review.summary || review.book_review_link 
-                ? `${review.summary || ''}\n\nRead the full NY Times review: ${review.url}`.trim()
-                : undefined;
-              
-              result = {
-                ...result,
-                summary: result.summary || nytSummary,
-                // NY Times doesn't provide ratings, but we can note it's a reviewed book
-              };
+            if (item.volumeInfo.averageRating) {
+              ratingsSources.push({
+                source: 'googleBooks',
+                rating: item.volumeInfo.averageRating,
+                ratingsCount: item.volumeInfo.ratingsCount,
+                label: 'Google Books',
+                url: item.volumeInfo.infoLink || `https://books.google.com/books?id=${item.id}`,
+              });
             }
           }
-        } catch {
-          // NY Times API failed, continue with what we have
         }
-      }
+      } catch { /* ignore */ }
+    })());
+    
+    // NY Times
+    if (nytApiKey) {
+      fetchPromises.push((async () => {
+        try {
+          const nytUrl = `https://api.nytimes.com/svc/books/v3/reviews.json?title=${encodeURIComponent(book.title)}&api-key=${nytApiKey}`;
+          const nytResponse = await fetchWithTimeout(nytUrl, 5000);
+          if (nytResponse?.ok) {
+            const nytData = await nytResponse.json();
+            const review = nytData.results?.[0];
+            if (review) {
+              result.nytReviewUrl = review.url;
+              nytSummary = review.summary;
+              ratingsSources.push({
+                source: 'nyTimes',
+                label: 'NY Times',
+                url: review.url,
+              });
+            }
+          }
+        } catch { /* ignore */ }
+      })());
     }
     
-    // If we still have no summary, try one more source: Wikipedia via Open Library's description
+    // Open Library search + work details
+    if (!workKey) {
+      fetchPromises.push((async () => {
+        try {
+          const searchResponse = await fetchWithTimeout(
+            `https://openlibrary.org/search.json?q=${encodeURIComponent(searchQuery)}&limit=1&fields=key,title,author_name,ratings_average,ratings_count`,
+            5000
+          );
+          if (searchResponse?.ok) {
+            const searchData = await searchResponse.json();
+            if (searchData.docs?.[0]) {
+              workKey = searchData.docs[0].key;
+              if (searchData.docs[0].ratings_average) {
+                ratingsSources.push({
+                  source: 'openLibrary',
+                  rating: searchData.docs[0].ratings_average,
+                  ratingsCount: searchData.docs[0].ratings_count,
+                  label: 'Open Library',
+                  url: `https://openlibrary.org${workKey}`,
+                });
+              }
+              
+              // Also fetch work details now that we have the key
+              try {
+                const workResponse = await fetchWithTimeout(`https://openlibrary.org${workKey}.json`, 4000);
+                if (workResponse?.ok) {
+                  const workData = await workResponse.json();
+                  if (workData.description) {
+                    openLibrarySummary = typeof workData.description === 'string' 
+                      ? workData.description 
+                      : workData.description.value;
+                  }
+                  openLibraryGenre = pickBestGenre(workData.subjects);
+                }
+              } catch { /* ignore */ }
+            }
+          }
+        } catch { /* ignore */ }
+      })());
+    } else {
+      // We already have a key, fetch work details and ratings in parallel
+      fetchPromises.push((async () => {
+        try {
+          const workResponse = await fetchWithTimeout(`https://openlibrary.org${workKey}.json`, 5000);
+          if (workResponse?.ok) {
+            const workData = await workResponse.json();
+            if (workData.description) {
+              openLibrarySummary = typeof workData.description === 'string' 
+                ? workData.description 
+                : workData.description.value;
+            }
+            openLibraryGenre = pickBestGenre(workData.subjects);
+          }
+        } catch { /* ignore */ }
+      })());
+      
+      fetchPromises.push((async () => {
+        try {
+          const ratingsResponse = await fetchWithTimeout(`https://openlibrary.org${workKey}/ratings.json`, 5000);
+          if (ratingsResponse?.ok) {
+            const ratingsData = await ratingsResponse.json();
+            if (ratingsData.summary?.average) {
+              ratingsSources.push({
+                source: 'openLibrary',
+                rating: ratingsData.summary.average,
+                ratingsCount: ratingsData.summary.count,
+                label: 'Open Library',
+                url: `https://openlibrary.org${workKey}`,
+              });
+            }
+          }
+        } catch { /* ignore */ }
+      })());
+    }
+    
+    // Wait for all parallel fetches
+    await Promise.all(fetchPromises);
+    
+    // MERGE DATA with priority: Open Library > Google Books > NY Times
+    // Summary priority: Open Library (most detailed) > Google Books > NY Times
+    result.summary = openLibrarySummary || googleBooksSummary || nytSummary || result.summary;
+    
+    // Genre priority: Open Library > Google Books
+    result.genre = result.genre || openLibraryGenre || googleBooksGenre;
+    
+    // Pages: Google Books often has this
+    result.pages = result.pages || googleBooksPages;
+    
+    // PHASE 2: Fallback for summary if still missing - try ISBN lookup
     if (!result.summary && book.isbn) {
       try {
-        const isbnResponse = await fetch(`https://openlibrary.org/isbn/${book.isbn}.json`);
-        if (isbnResponse.ok) {
+        const isbnResponse = await fetchWithTimeout(`https://openlibrary.org/isbn/${book.isbn}.json`, 4000);
+        if (isbnResponse?.ok) {
           const isbnData = await isbnResponse.json();
           if (isbnData.description) {
             result.summary = typeof isbnData.description === 'string'
@@ -360,15 +409,32 @@ export async function getBookDetails(book: BookSearchResult): Promise<BookDetail
               : isbnData.description.value;
           }
         }
-      } catch {
-        // Continue with what we have
-      }
+      } catch { /* ignore */ }
     }
     
+    // Calculate combined rating from available sources
+    const numericRatings = ratingsSources.filter(r => r.rating !== undefined);
+    if (numericRatings.length > 0) {
+      let totalWeight = 0;
+      let weightedSum = 0;
+      let totalCount = 0;
+      
+      for (const source of numericRatings) {
+        const weight = source.ratingsCount || 1;
+        weightedSum += (source.rating || 0) * weight;
+        totalWeight += weight;
+        totalCount += source.ratingsCount || 0;
+      }
+      
+      result.rating = weightedSum / totalWeight;
+      result.ratingsCount = totalCount;
+    }
+    
+    result.ratingsSources = ratingsSources;
     return result;
   } catch (error) {
     console.warn('Failed to fetch book details:', error);
-    return book;
+    return { ...book, ratingsSources };
   }
 }
 
