@@ -284,33 +284,125 @@ export async function getBookDetails(book: BookSearchResult): Promise<BookDetail
       }
     }
     
-    // Fallback: try Google Books API for description
+    // Fallback chain: Google Books → NY Times
+    let result: BookDetails = { ...book };
+    
+    // Try Google Books API for description and rating
     const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_BOOKS_API_KEY;
     const searchQuery = `${book.title} ${book.author}`;
-    const url = googleApiKey
+    const googleUrl = googleApiKey
       ? `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=1&key=${googleApiKey}`
       : `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=1`;
     
-    const response = await fetch(url);
-    
-    if (response.ok) {
-      const data = await response.json();
-      const item = data.items?.[0];
+    try {
+      const googleResponse = await fetch(googleUrl);
       
-      if (item?.volumeInfo) {
-        return {
-          ...book,
-          summary: item.volumeInfo.description,
-          genre: book.genre || pickBestGenre(item.volumeInfo.categories),
-          rating: book.rating || item.volumeInfo.averageRating || undefined,
-          ratingsCount: book.ratingsCount || item.volumeInfo.ratingsCount || undefined,
-        };
+      if (googleResponse.ok) {
+        const googleData = await googleResponse.json();
+        const item = googleData.items?.[0];
+        
+        if (item?.volumeInfo) {
+          result = {
+            ...result,
+            summary: result.summary || item.volumeInfo.description,
+            genre: result.genre || pickBestGenre(item.volumeInfo.categories),
+            rating: result.rating || item.volumeInfo.averageRating || undefined,
+            ratingsCount: result.ratingsCount || item.volumeInfo.ratingsCount || undefined,
+            pages: result.pages || item.volumeInfo.pageCount || undefined,
+          };
+        }
+      }
+    } catch {
+      // Continue to next fallback
+    }
+    
+    // Try NY Times Books API for review summary (if we still don't have a summary)
+    if (!result.summary) {
+      const nytApiKey = process.env.NEXT_PUBLIC_NYTIMES_API_KEY;
+      if (nytApiKey) {
+        try {
+          // Search for book review by title
+          const nytUrl = `https://api.nytimes.com/svc/books/v3/reviews.json?title=${encodeURIComponent(book.title)}&api-key=${nytApiKey}`;
+          const nytResponse = await fetch(nytUrl);
+          
+          if (nytResponse.ok) {
+            const nytData = await nytResponse.json();
+            const review = nytData.results?.[0];
+            
+            if (review) {
+              // NY Times provides review summary and sometimes a book description
+              const nytSummary = review.summary || review.book_review_link 
+                ? `${review.summary || ''}\n\nRead the full NY Times review: ${review.url}`.trim()
+                : undefined;
+              
+              result = {
+                ...result,
+                summary: result.summary || nytSummary,
+                // NY Times doesn't provide ratings, but we can note it's a reviewed book
+              };
+            }
+          }
+        } catch {
+          // NY Times API failed, continue with what we have
+        }
       }
     }
     
-    return book;
+    // If we still have no summary, try one more source: Wikipedia via Open Library's description
+    if (!result.summary && book.isbn) {
+      try {
+        const isbnResponse = await fetch(`https://openlibrary.org/isbn/${book.isbn}.json`);
+        if (isbnResponse.ok) {
+          const isbnData = await isbnResponse.json();
+          if (isbnData.description) {
+            result.summary = typeof isbnData.description === 'string'
+              ? isbnData.description
+              : isbnData.description.value;
+          }
+        }
+      } catch {
+        // Continue with what we have
+      }
+    }
+    
+    return result;
   } catch (error) {
     console.warn('Failed to fetch book details:', error);
     return book;
+  }
+}
+
+// Fetch from NY Times Bestseller lists (useful for book discovery)
+export async function getNYTimesBestsellers(listName: string = 'hardcover-fiction'): Promise<BookSearchResult[]> {
+  const apiKey = process.env.NEXT_PUBLIC_NYTIMES_API_KEY;
+  if (!apiKey) {
+    console.warn('NY Times API key not configured');
+    return [];
+  }
+  
+  try {
+    const url = `https://api.nytimes.com/svc/books/v3/lists/current/${listName}.json?api-key=${apiKey}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      return [];
+    }
+    
+    const data = await response.json();
+    const books = data.results?.books || [];
+    
+    return books.map((book: any) => ({
+      title: book.title || 'Unknown Title',
+      author: book.author || 'Unknown Author',
+      coverUrl: book.book_image || undefined,
+      isbn: book.primary_isbn13 || book.primary_isbn10,
+      genre: listName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      // NY Times provides weeks on list info
+      weeksOnList: book.weeks_on_list,
+      rank: book.rank,
+    }));
+  } catch (error) {
+    console.warn('Failed to fetch NY Times bestsellers:', error);
+    return [];
   }
 }
