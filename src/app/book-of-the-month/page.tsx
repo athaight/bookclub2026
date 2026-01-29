@@ -19,8 +19,11 @@ import {
   ListItemButton,
   ListItemText,
   IconButton,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
@@ -86,8 +89,14 @@ export default function BookOfTheMonthPage() {
 
   const [loading, setLoading] = useState(true);
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
-  const [currentMonth] = useState(getCurrentYearMonth());
+  const currentMonth = useMemo(() => getCurrentYearMonth(), []);
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth());
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [bookOfMonth, setBookOfMonth] = useState<BookOfTheMonthRow | null>(null);
+  
+  // Month selector dropdown state
+  const [monthMenuAnchor, setMonthMenuAnchor] = useState<null | HTMLElement>(null);
+  const monthMenuOpen = Boolean(monthMenuAnchor);
   
   // Summary modal state (for public users clicking cover)
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
@@ -112,11 +121,11 @@ export default function BookOfTheMonthPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastQuery, setLastQuery] = useState("");
 
-  // Calculate current picker
-  const [year, month] = currentMonth.split("-").map(Number);
-  const currentPickerEmail = getPickerForMonth(year, month);
-  const currentPicker = members.find(m => m.email === currentPickerEmail);
-  const isCurrentPicker = authedEmail === currentPickerEmail;
+  // Calculate picker for selected month (not necessarily current month)
+  const [year, month] = selectedMonth.split("-").map(Number);
+  const selectedPickerEmail = getPickerForMonth(year, month);
+  const selectedPicker = members.find(m => m.email === selectedPickerEmail);
+  const isCurrentPicker = authedEmail === selectedPickerEmail && selectedMonth === currentMonth;
 
   // Check auth
   useEffect(() => {
@@ -146,7 +155,30 @@ export default function BookOfTheMonthPage() {
     return () => sub.subscription.unsubscribe();
   }, [members]);
 
-  // Fetch current month's book
+  // Fetch available months (all months with books)
+  useEffect(() => {
+    async function fetchAvailableMonths() {
+      const { data, error } = await supabase
+        .from("book_of_the_month")
+        .select("year_month")
+        .order("year_month", { ascending: false });
+
+      if (!error && data) {
+        const months = data.map(d => d.year_month);
+        // Ensure current month is always in the list
+        if (!months.includes(currentMonth)) {
+          months.unshift(currentMonth);
+        }
+        setAvailableMonths(months);
+      } else {
+        // If fetch fails, at least show current month
+        setAvailableMonths([currentMonth]);
+      }
+    }
+    fetchAvailableMonths();
+  }, [currentMonth]);
+
+  // Fetch selected month's book
   useEffect(() => {
     async function fetchBook() {
       setLoading(true);
@@ -154,7 +186,7 @@ export default function BookOfTheMonthPage() {
       const { data, error } = await supabase
         .from("book_of_the_month")
         .select("*")
-        .eq("year_month", currentMonth)
+        .eq("year_month", selectedMonth)
         .single();
 
       if (!error && data) {
@@ -166,7 +198,7 @@ export default function BookOfTheMonthPage() {
       setLoading(false);
     }
     fetchBook();
-  }, [currentMonth]);
+  }, [selectedMonth]);
 
   // Search handlers
   async function handleSearch() {
@@ -297,7 +329,7 @@ export default function BookOfTheMonthPage() {
       // If user selected a new file, upload it
       if (pendingCoverFile) {
         const fileExt = pendingCoverFile.name.split(".").pop();
-        const fileName = `botm_${currentMonth}_${Date.now()}.${fileExt}`;
+        const fileName = `botm_${selectedMonth}_${Date.now()}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from("book-covers")
@@ -314,8 +346,8 @@ export default function BookOfTheMonthPage() {
       }
 
       const bookData = {
-        year_month: currentMonth,
-        picker_email: currentPickerEmail,
+        year_month: selectedMonth,
+        picker_email: selectedPickerEmail,
         book_title: selectedBook.title,
         book_author: selectedBook.author,
         book_cover_url: finalCoverUrl || null,
@@ -346,10 +378,24 @@ export default function BookOfTheMonthPage() {
       const { data } = await supabase
         .from("book_of_the_month")
         .select("*")
-        .eq("year_month", currentMonth)
+        .eq("year_month", selectedMonth)
         .single();
 
       if (data) setBookOfMonth(data);
+
+      // Refresh available months list
+      const { data: monthsData } = await supabase
+        .from("book_of_the_month")
+        .select("year_month")
+        .order("year_month", { ascending: false });
+      
+      if (monthsData) {
+        const months = monthsData.map(d => d.year_month);
+        if (!months.includes(currentMonth)) {
+          months.unshift(currentMonth);
+        }
+        setAvailableMonths(months);
+      }
 
       handleCloseDialog();
     } catch (e) {
@@ -384,7 +430,7 @@ export default function BookOfTheMonthPage() {
           </Typography>
         </motion.div>
 
-        {/* January 2026 - fade up and in */}
+        {/* Month Selector Dropdown */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -394,9 +440,73 @@ export default function BookOfTheMonthPage() {
             ease: [0.16, 1, 0.3, 1],
           }}
         >
-          <Typography variant="h6" sx={{ color: "text.secondary", mb: 1 }}>
-            {formatMonthYear(currentMonth)}
-          </Typography>
+          <Button
+            onClick={(e) => setMonthMenuAnchor(e.currentTarget)}
+            endIcon={<KeyboardArrowDownIcon />}
+            sx={{ 
+              color: "text.secondary", 
+              textTransform: "none",
+              fontSize: "1.25rem",
+              fontWeight: 400,
+              mb: 1,
+              "&:hover": {
+                bgcolor: "action.hover",
+              }
+            }}
+          >
+            {formatMonthYear(selectedMonth)}
+            {selectedMonth !== currentMonth && (
+              <Typography 
+                component="span" 
+                sx={{ 
+                  ml: 1, 
+                  fontSize: "0.75rem", 
+                  color: "warning.main",
+                  fontWeight: 600,
+                }}
+              >
+                (Past)
+              </Typography>
+            )}
+          </Button>
+          <Menu
+            anchorEl={monthMenuAnchor}
+            open={monthMenuOpen}
+            onClose={() => setMonthMenuAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            transformOrigin={{ vertical: "top", horizontal: "center" }}
+            PaperProps={{
+              sx: { maxHeight: 300, minWidth: 180 }
+            }}
+          >
+            {availableMonths.map((monthStr) => (
+              <MenuItem
+                key={monthStr}
+                selected={monthStr === selectedMonth}
+                onClick={() => {
+                  setSelectedMonth(monthStr);
+                  setMonthMenuAnchor(null);
+                }}
+                sx={{
+                  fontWeight: monthStr === currentMonth ? 600 : 400,
+                }}
+              >
+                {formatMonthYear(monthStr)}
+                {monthStr === currentMonth && (
+                  <Typography 
+                    component="span" 
+                    sx={{ 
+                      ml: 1, 
+                      fontSize: "0.7rem", 
+                      color: "primary.main",
+                    }}
+                  >
+                    (Current)
+                  </Typography>
+                )}
+              </MenuItem>
+            ))}
+          </Menu>
         </motion.div>
 
         {/* Picker section - slide from center outward, wraps on small screens */}
@@ -412,12 +522,12 @@ export default function BookOfTheMonthPage() {
             }}
           >
             <Typography variant="body1" sx={{ color: "text.secondary" }}>
-              This month&apos;s book is picked by
+              {selectedMonth === currentMonth ? "This month's" : "That month's"} book {selectedMonth === currentMonth ? "is" : "was"} picked by
             </Typography>
           </motion.div>
 
           {/* Avatar & Name - slide from center to right */}
-          {currentPicker && (
+          {selectedPicker && (
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -429,19 +539,19 @@ export default function BookOfTheMonthPage() {
             >
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <MemberAvatar 
-                  name={currentPicker.name} 
-                  email={currentPicker.email} 
+                  name={selectedPicker.name} 
+                  email={selectedPicker.email} 
                   profiles={profiles} 
                   size="small" 
                   linkToProfile 
                 />
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {currentPicker.name}
+                  {selectedPicker.name}
                 </Typography>
               </Box>
             </motion.div>
           )}
-          {authedEmail && (
+          {authedEmail && selectedMonth === currentMonth && (
             <IconButton onClick={handleOpenDialog} color="primary" size="small">
               <EditIcon fontSize="small" />
             </IconButton>
@@ -564,11 +674,11 @@ export default function BookOfTheMonthPage() {
           </Box>
 
           {/* Why Picked Accordion */}
-          {bookOfMonth.why_picked && currentPicker && (
+          {bookOfMonth.why_picked && selectedPicker && (
             <motion.div>
               <Accordion sx={{ mb: 2 }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6">Why {currentPicker.name} Picked This Book</Typography>
+                  <Typography variant="h6">Why {selectedPicker.name} Picked This Book</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
@@ -601,9 +711,9 @@ export default function BookOfTheMonthPage() {
       ) : (
         <Box sx={{ textAlign: "center", py: 8 }}>
           <Typography variant="h6" sx={{ color: "text.secondary", mb: 2 }}>
-            No book selected yet for {formatMonthYear(currentMonth)}
+            No book selected yet for {formatMonthYear(selectedMonth)}
           </Typography>
-          {authedEmail && (
+          {authedEmail && selectedMonth === currentMonth && (
             <Button variant="contained" onClick={handleOpenDialog}>
               Pick This Month&apos;s Book
             </Button>
