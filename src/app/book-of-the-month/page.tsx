@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   Typography,
   Box,
@@ -21,12 +21,14 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  Tooltip,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
@@ -67,6 +69,26 @@ function getPickerForMonth(year: number, month: number): string {
   // Get picker index (cycling through the members)
   const pickerIndex = ((monthsSinceStart % pickerOrder.length) + pickerOrder.length) % pickerOrder.length;
   return pickerOrder[pickerIndex];
+}
+
+// Get the next picker in rotation after a given email
+function getNextPicker(currentPickerEmail: string): string {
+  const pickerOrder = getPickerOrder();
+  if (pickerOrder.length === 0) return "";
+  
+  const currentIndex = pickerOrder.indexOf(currentPickerEmail);
+  if (currentIndex === -1) return pickerOrder[0];
+  
+  const nextIndex = (currentIndex + 1) % pickerOrder.length;
+  return pickerOrder[nextIndex];
+}
+
+// Check if we're past the grace period (3rd day of month)
+function isPastGracePeriod(yearMonth: string): boolean {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const now = new Date();
+  const graceDate = new Date(year, month - 1, 3, 23, 59, 59); // End of 3rd day
+  return now > graceDate;
 }
 
 function getCurrentYearMonth(): string {
@@ -121,11 +143,34 @@ export default function BookOfTheMonthPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastQuery, setLastQuery] = useState("");
 
+  // Picker override state (for trading months)
+  const [pickerOverride, setPickerOverride] = useState<string | null>(null);
+  const [tradeDialogOpen, setTradeDialogOpen] = useState(false);
+  const [tradeSaving, setTradeSaving] = useState(false);
+
   // Calculate picker for selected month (not necessarily current month)
   const [year, month] = selectedMonth.split("-").map(Number);
-  const selectedPickerEmail = getPickerForMonth(year, month);
-  const selectedPicker = members.find(m => m.email === selectedPickerEmail);
-  const isCurrentPicker = authedEmail === selectedPickerEmail && selectedMonth === currentMonth;
+  const originalPickerEmail = getPickerForMonth(year, month);
+  
+  // Determine effective picker: check override first, then auto-advance if past grace period
+  const effectivePickerEmail = useMemo(() => {
+    // If there's a trade/override, use that
+    if (pickerOverride) {
+      return pickerOverride;
+    }
+    
+    // If no book selected and we're past the grace period, auto-advance
+    if (!bookOfMonth && isPastGracePeriod(selectedMonth)) {
+      return getNextPicker(originalPickerEmail);
+    }
+    
+    return originalPickerEmail;
+  }, [pickerOverride, bookOfMonth, selectedMonth, originalPickerEmail]);
+  
+  const effectivePicker = members.find(m => m.email === effectivePickerEmail);
+  const originalPicker = members.find(m => m.email === originalPickerEmail);
+  const isEffectivePicker = authedEmail === effectivePickerEmail && selectedMonth === currentMonth;
+  const wasAutoAdvanced = !pickerOverride && !bookOfMonth && isPastGracePeriod(selectedMonth) && effectivePickerEmail !== originalPickerEmail;
 
   // Check auth
   useEffect(() => {
@@ -154,6 +199,24 @@ export default function BookOfTheMonthPage() {
 
     return () => sub.subscription.unsubscribe();
   }, [members]);
+
+  // Fetch picker override for selected month
+  useEffect(() => {
+    async function fetchPickerOverride() {
+      const { data, error } = await supabase
+        .from("book_of_month_picker_overrides")
+        .select("new_picker_email")
+        .eq("year_month", selectedMonth)
+        .single();
+
+      if (!error && data) {
+        setPickerOverride(normEmail(data.new_picker_email));
+      } else {
+        setPickerOverride(null);
+      }
+    }
+    fetchPickerOverride();
+  }, [selectedMonth]);
 
   // Fetch available months (all months with books)
   useEffect(() => {
@@ -347,7 +410,7 @@ export default function BookOfTheMonthPage() {
 
       const bookData = {
         year_month: selectedMonth,
-        picker_email: selectedPickerEmail,
+        picker_email: effectivePickerEmail,
         book_title: selectedBook.title,
         book_author: selectedBook.author,
         book_cover_url: finalCoverUrl || null,
@@ -402,6 +465,32 @@ export default function BookOfTheMonthPage() {
       alert(`Error saving: ${e instanceof Error ? e.message : "Unknown error"}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Handle trading/passing the month to another user
+  async function handleTrade(newPickerEmail: string) {
+    if (!authedEmail) return;
+
+    setTradeSaving(true);
+    try {
+      // Upsert the override
+      const { error } = await supabase
+        .from("book_of_month_picker_overrides")
+        .upsert({
+          year_month: selectedMonth,
+          original_picker_email: originalPickerEmail,
+          new_picker_email: newPickerEmail,
+        }, { onConflict: 'year_month' });
+
+      if (error) throw new Error(error.message);
+
+      setPickerOverride(newPickerEmail);
+      setTradeDialogOpen(false);
+    } catch (e) {
+      alert(`Error trading month: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setTradeSaving(false);
     }
   }
 
@@ -527,7 +616,7 @@ export default function BookOfTheMonthPage() {
           </motion.div>
 
           {/* Avatar & Name - slide from center to right */}
-          {selectedPicker && (
+          {effectivePicker && (
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -539,22 +628,50 @@ export default function BookOfTheMonthPage() {
             >
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <MemberAvatar 
-                  name={selectedPicker.name} 
-                  email={selectedPicker.email} 
+                  name={effectivePicker.name} 
+                  email={effectivePicker.email} 
                   profiles={profiles} 
                   size="small" 
                   linkToProfile 
                 />
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {selectedPicker.name}
+                  {effectivePicker.name}
                 </Typography>
+                {/* Show indicator if traded or auto-advanced */}
+                {pickerOverride && originalPicker && (
+                  <Tooltip title={`Traded from ${originalPicker.name}`}>
+                    <Typography variant="caption" sx={{ color: "warning.main", ml: 0.5 }}>
+                      (traded)
+                    </Typography>
+                  </Tooltip>
+                )}
+                {wasAutoAdvanced && originalPicker && (
+                  <Tooltip title={`Auto-advanced from ${originalPicker.name} (no pick by 3rd)`}>
+                    <Typography variant="caption" sx={{ color: "error.main", ml: 0.5 }}>
+                      (auto-advanced)
+                    </Typography>
+                  </Tooltip>
+                )}
               </Box>
             </motion.div>
           )}
-          {authedEmail && selectedMonth === currentMonth && (
-            <IconButton onClick={handleOpenDialog} color="primary" size="small">
-              <EditIcon fontSize="small" />
-            </IconButton>
+          
+          {/* Edit button - only for effective picker on current month when no book yet OR editing their own pick */}
+          {authedEmail === effectivePickerEmail && selectedMonth === currentMonth && (
+            <Tooltip title="Edit book selection">
+              <IconButton onClick={handleOpenDialog} color="primary" size="small">
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          
+          {/* Trade button - only for effective picker on current month when no book selected yet */}
+          {authedEmail === effectivePickerEmail && selectedMonth === currentMonth && !bookOfMonth && (
+            <Tooltip title="Pass your turn to another member">
+              <IconButton onClick={() => setTradeDialogOpen(true)} color="secondary" size="small">
+                <SwapHorizIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           )}
         </Box>
       </Box>
@@ -674,11 +791,11 @@ export default function BookOfTheMonthPage() {
           </Box>
 
           {/* Why Picked Accordion */}
-          {bookOfMonth.why_picked && selectedPicker && (
+          {bookOfMonth.why_picked && effectivePicker && (
             <motion.div>
               <Accordion sx={{ mb: 2 }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6">Why {selectedPicker.name} Picked This Book</Typography>
+                  <Typography variant="h6">Why {effectivePicker.name} Picked This Book</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
@@ -713,10 +830,24 @@ export default function BookOfTheMonthPage() {
           <Typography variant="h6" sx={{ color: "text.secondary", mb: 2 }}>
             No book selected yet for {formatMonthYear(selectedMonth)}
           </Typography>
-          {authedEmail && selectedMonth === currentMonth && (
-            <Button variant="contained" onClick={handleOpenDialog}>
-              Pick This Month&apos;s Book
-            </Button>
+          {wasAutoAdvanced && originalPicker && (
+            <Typography variant="body2" sx={{ color: "warning.main", mb: 2 }}>
+              {originalPicker.name} didn&apos;t pick by the 3rd, so it&apos;s now {effectivePicker?.name}&apos;s turn
+            </Typography>
+          )}
+          {authedEmail === effectivePickerEmail && selectedMonth === currentMonth && (
+            <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+              <Button variant="contained" onClick={handleOpenDialog}>
+                Pick This Month&apos;s Book
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<SwapHorizIcon />}
+                onClick={() => setTradeDialogOpen(true)}
+              >
+                Pass to Someone Else
+              </Button>
+            </Box>
           )}
         </Box>
       )}
@@ -970,6 +1101,45 @@ export default function BookOfTheMonthPage() {
             disabled={saving || !selectedBook}
           >
             {saving ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Trade Month Dialog */}
+      <Dialog 
+        open={tradeDialogOpen} 
+        onClose={() => setTradeDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Pass Your Turn</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+            Select a member to pick this month&apos;s book instead of you:
+          </Typography>
+          <List>
+            {members
+              .filter(m => m.email !== effectivePickerEmail)
+              .map(member => (
+                <ListItemButton
+                  key={member.email}
+                  onClick={() => handleTrade(member.email)}
+                  disabled={tradeSaving}
+                >
+                  <MemberAvatar
+                    name={member.name}
+                    email={member.email}
+                    profiles={profiles}
+                    size="small"
+                  />
+                  <ListItemText primary={member.name} sx={{ ml: 2 }} />
+                </ListItemButton>
+              ))}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTradeDialogOpen(false)} disabled={tradeSaving}>
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>
