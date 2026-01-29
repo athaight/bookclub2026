@@ -1,51 +1,53 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { 
-  Box, 
-  Button, 
-  CircularProgress, 
+import { useRouter } from "next/navigation";
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  TextField,
   Typography,
+  Alert,
   Divider,
-  Paper,
   Switch,
   FormControlLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Alert,
+  Snackbar,
 } from "@mui/material";
+import SaveIcon from "@mui/icons-material/Save";
+import LogoutIcon from "@mui/icons-material/Logout";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
-import PersonIcon from "@mui/icons-material/Person";
-import ArticleIcon from "@mui/icons-material/Article";
-import SettingsIcon from "@mui/icons-material/Settings";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getMembers } from "@/lib/members";
-
-type Member = { email: string; name: string };
+import { ProfileRow } from "@/types";
+import BookDiscoveryModal from "@/components/BookDiscoveryModal";
 
 const normEmail = (s: string) => s.trim().toLowerCase();
 
 export default function AdminPage() {
   const router = useRouter();
-  const members = useMemo<Member[]>(
-    () => getMembers().map((m) => ({ ...m, email: normEmail(m.email) })),
-    []
-  );
+  const members = useMemo(() => getMembers().map((m) => ({ ...m, email: normEmail(m.email) })), []);
 
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("");
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
   
   // Notification preferences state
   const [emailOnMention, setEmailOnMention] = useState(true);
   const [emailOnAllComments, setEmailOnAllComments] = useState(false);
   const [prefsLoading, setPrefsLoading] = useState(false);
   const [prefsSaving, setPrefsSaving] = useState(false);
-  const [prefsMessage, setPrefsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -57,72 +59,125 @@ export default function AdminPage() {
       if (!mounted) return;
 
       if (!email) {
-        setCheckingSession(false);
-        window.location.href = "/admin/login";
+        router.push("/welcome/login");
         return;
       }
 
-      const member = members.find((m) => m.email === email);
-      if (!member) {
-        await supabase.auth.signOut({ scope: 'local' });
-        setCheckingSession(false);
-        window.location.href = "/admin/login";
+      const allowed = members.some((m) => m.email === email);
+      if (!allowed) {
+        await supabase.auth.signOut({ scope: "local" });
+        router.push("/welcome/login");
         return;
       }
 
       setAuthedEmail(email);
-      setUserName(member.name);
-      setCheckingSession(false);
-    })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      const email = session?.user?.email ? normEmail(session.user.email) : null;
-      if (!email) {
-        window.location.href = "/admin/login";
+      // Fetch profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      if (profileError && profileError.code !== "PGRST116") {
+        // PGRST116 = no rows returned
+        setError("Error loading profile");
+        setLoading(false);
         return;
       }
-      const member = members.find((m) => m.email === email);
-      setAuthedEmail(email);
-      setUserName(member?.name || "");
-      setCheckingSession(false);
-    });
 
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [members]);
+      if (profileData) {
+        setProfile(profileData);
+        setDisplayName(profileData.display_name || "");
+        setAvatarUrl(profileData.avatar_url || null);
+      } else {
+        // Use member name as default
+        const member = members.find((m) => m.email === email);
+        setDisplayName(member?.name || "");
+      }
 
-  // Fetch notification preferences when authenticated
-  useEffect(() => {
-    if (!authedEmail) return;
-    
-    const fetchPrefs = async () => {
+      setLoading(false);
+      
+      // Fetch notification preferences
       setPrefsLoading(true);
       try {
-        const response = await fetch(`/api/notifications/preferences?userEmail=${authedEmail}`);
-        const data = await response.json();
-        if (data.preferences) {
-          setEmailOnMention(data.preferences.email_on_mention);
-          setEmailOnAllComments(data.preferences.email_on_all_comments);
+        const prefsResponse = await fetch(`/api/notifications/preferences?userEmail=${email}`);
+        if (prefsResponse.ok) {
+          const prefsData = await prefsResponse.json();
+          if (prefsData.preferences) {
+            setEmailOnMention(prefsData.preferences.email_on_mention);
+            setEmailOnAllComments(prefsData.preferences.email_on_all_comments);
+          }
         }
-      } catch (error) {
-        console.error('Error fetching notification preferences:', error);
+      } catch (err) {
+        console.error('Error fetching notification preferences:', err);
       } finally {
         setPrefsLoading(false);
       }
-    };
-    
-    fetchPrefs();
-  }, [authedEmail]);
+    })();
 
-  // Save notification preferences
-  const handleSavePreferences = async () => {
+    return () => {
+      mounted = false;
+    };
+  }, [router, members]);
+
+  async function handleSave() {
+    if (!authedEmail) return;
+
+    const name = displayName.trim();
+    if (!name) {
+      setError("Display name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const profileData = {
+        email: authedEmail,
+        display_name: name,
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (profile) {
+        // Update existing profile
+        const { error } = await supabase
+          .from("profiles")
+          .update(profileData)
+          .eq("email", authedEmail);
+
+        if (error) throw new Error(error.message);
+      } else {
+        // Insert new profile
+        const { error } = await supabase.from("profiles").insert({
+          ...profileData,
+          created_at: new Date().toISOString(),
+        });
+
+        if (error) throw new Error(error.message);
+      }
+
+      setSuccess("Profile saved successfully!");
+      setProfile({ ...profileData, created_at: profile?.created_at || new Date().toISOString() } as ProfileRow);
+    } catch (e) {
+      setError(`Error saving profile: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut({ scope: "local" });
+    router.push("/");
+  }
+
+  async function handleSaveNotificationPrefs() {
     if (!authedEmail) return;
     
     setPrefsSaving(true);
-    setPrefsMessage(null);
-    
     try {
       const response = await fetch('/api/notifications/preferences', {
         method: 'POST',
@@ -135,250 +190,216 @@ export default function AdminPage() {
       });
       
       if (response.ok) {
-        setPrefsMessage({ type: 'success', text: 'Preferences saved successfully!' });
-        setTimeout(() => setPrefsMessage(null), 3000);
+        setSnackbarOpen(true);
       } else {
-        throw new Error('Failed to save');
+        setError('Failed to save notification preferences');
       }
-    } catch (error) {
-      setPrefsMessage({ type: 'error', text: 'Failed to save preferences. Please try again.' });
+    } catch (err) {
+      setError('Failed to save notification preferences');
     } finally {
       setPrefsSaving(false);
     }
-  };
+  }
 
-  if (checkingSession) {
+  if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-          gap: 2,
-        }}
-      >
+      <Box sx={{ textAlign: "center", mt: 4 }}>
         <CircularProgress />
-        <Typography>Loading...</Typography>
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          Loading profile...
+        </Typography>
       </Box>
     );
   }
 
-  if (!authedEmail) return null;
-
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "70vh",
-        textAlign: "center",
-        px: 3,
-      }}
-    >
-      {/* Hero Section */}
-      <Typography
-        variant="h3"
-        component="h1"
-        sx={{
-          fontWeight: 800,
-          mb: 2,
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          backgroundClip: "text",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-        }}
-      >
-        Welcome {userName} to your book club, book bro!
-      </Typography>
-
-      <Typography
-        variant="h6"
-        sx={{
-          color: "text.secondary",
-          mb: 5,
-          maxWidth: 500,
-        }}
-      >
-        You&apos;re logged in as an admin for {userName}
-      </Typography>
-
-      {/* Action Buttons */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 3,
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<AutoStoriesIcon />}
-          onClick={() => router.push("/reading-challenge")}
-          sx={{
-            px: 4,
-            py: 1.5,
-            fontSize: "1.1rem",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            "&:hover": {
-              background: "linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%)",
-            },
-          }}
-        >
-          Enter
-        </Button>
-
-        <Button
-          variant="outlined"
-          size="large"
-          startIcon={<PersonIcon />}
-          onClick={() => router.push("/profile")}
-          sx={{
-            px: 4,
-            py: 1.5,
-            fontSize: "1.1rem",
-            borderColor: "#667eea",
-            color: "#667eea",
-            "&:hover": {
-              borderColor: "#764ba2",
-              backgroundColor: "rgba(102, 126, 234, 0.04)",
-            },
-          }}
-        >
-          Admin
-        </Button>
-
-        <Button
-          variant="outlined"
-          size="large"
-          startIcon={<ArticleIcon />}
-          onClick={() => router.push("/book-report")}
-          sx={{
-            px: 4,
-            py: 1.5,
-            fontSize: "1.1rem",
-            borderColor: "#667eea",
-            color: "#667eea",
-            "&:hover": {
-              borderColor: "#764ba2",
-              backgroundColor: "rgba(102, 126, 234, 0.04)",
-            },
-          }}
-        >
-          Book Reports
-        </Button>
-      </Box>
-
-      {/* Settings Section */}
-      <Divider sx={{ my: 6, width: "100%", maxWidth: 600 }} />
-      
-      <Box sx={{ width: "100%", maxWidth: 600 }}>
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 700,
-            mb: 3,
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-          }}
-        >
-          <SettingsIcon /> Settings
+    <>
+      <Box sx={{ textAlign: "center", mb: 4 }}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Admin for {displayName || authedEmail}
         </Typography>
-
-        <Accordion defaultExpanded>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <NotificationsIcon color="primary" />
-              <Typography variant="h6">Notifications</Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Control how you receive notifications about comments on Book of the Month.
-              </Typography>
-
-              {prefsLoading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-                  <CircularProgress size={24} />
-                </Box>
-              ) : (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={emailOnMention}
-                        onChange={(e) => setEmailOnMention(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body1" fontWeight={500}>
-                          Email when mentioned
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Receive an email when someone @mentions you in a comment
-                        </Typography>
-                      </Box>
-                    }
-                    sx={{ alignItems: "flex-start", ml: 0 }}
-                  />
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={emailOnAllComments}
-                        onChange={(e) => setEmailOnAllComments(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body1" fontWeight={500}>
-                          All comments
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Receive an email for every new comment on the Book of the Month
-                        </Typography>
-                      </Box>
-                    }
-                    sx={{ alignItems: "flex-start", ml: 0 }}
-                  />
-
-                  {prefsMessage && (
-                    <Alert severity={prefsMessage.type} sx={{ mt: 1 }}>
-                      {prefsMessage.text}
-                    </Alert>
-                  )}
-
-                  <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={handleSavePreferences}
-                      disabled={prefsSaving}
-                      sx={{
-                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                        "&:hover": {
-                          background: "linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%)",
-                        },
-                      }}
-                    >
-                      {prefsSaving ? <CircularProgress size={20} color="inherit" /> : "Save Preferences"}
-                    </Button>
-                  </Box>
-                </Box>
-              )}
-            </Paper>
-          </AccordionDetails>
-        </Accordion>
       </Box>
-    </Box>
+
+      <Box sx={{ maxWidth: 500, mx: "auto" }}>
+        {/* Book Discovery Button - Prominent placement */}
+        <Box sx={{ mb: 3 }}>
+          <Button
+            variant="contained"
+            color="secondary"
+            size="large"
+            fullWidth
+            startIcon={<AutoStoriesIcon />}
+            onClick={() => setDiscoveryModalOpen(true)}
+            sx={{
+              py: 1.5,
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+            }}
+          >
+            📚 Discover Your Next Book
+          </Button>
+        </Box>
+
+        <Card>
+          <CardContent sx={{ display: "flex", flexDirection: "column", gap: 3, p: 3 }}>
+            {/* Avatar Display (read-only) */}
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+              <Avatar
+                src={avatarUrl || undefined}
+                alt={`Profile picture of ${displayName || 'user'}`}
+                sx={{ width: 120, height: 120, fontSize: 48 }}
+              >
+                {displayName ? displayName[0].toUpperCase() : "?"}
+              </Avatar>
+            </Box>
+
+            {/* Error/Success Messages */}
+            {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
+
+            {/* Email (read-only) */}
+            <TextField
+              label="Email"
+              value={authedEmail || ""}
+              disabled
+              fullWidth
+              helperText="Email cannot be changed"
+            />
+
+            {/* Display Name */}
+            <TextField
+              label="Display Name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              fullWidth
+              required
+              helperText="This is how your name appears on the site"
+            />
+
+            {/* Save Button */}
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              disabled={saving}
+              size="large"
+            >
+              {saving ? "Saving..." : "Save Profile"}
+            </Button>
+
+            {/* Logout Button */}
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<LogoutIcon />}
+              onClick={handleLogout}
+              size="large"
+            >
+              Log Out
+            </Button>
+
+            {/* Notification Settings */}
+            <Divider sx={{ my: 2 }} />
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <NotificationsIcon color="primary" />
+              <Typography variant="h6" fontWeight={600}>
+                Notification Settings
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Control how you receive notifications about comments on Book of the Month.
+            </Typography>
+
+            {prefsLoading ? (
+              <CircularProgress size={24} />
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={emailOnMention}
+                      onChange={(e) => setEmailOnMention(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Email when mentioned
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Get an email when someone @mentions you
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start', ml: 0 }}
+                />
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={emailOnAllComments}
+                      onChange={(e) => setEmailOnAllComments(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        All comments
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Get an email for every new comment
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start', ml: 0 }}
+                />
+
+                <Button
+                  variant="contained"
+                  onClick={handleSaveNotificationPrefs}
+                  disabled={prefsSaving}
+                  size="small"
+                  sx={{ alignSelf: 'flex-start', mt: 1 }}
+                >
+                  {prefsSaving ? 'Saving...' : 'Save Notifications'}
+                </Button>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Book Discovery Modal */}
+      {authedEmail && (
+        <BookDiscoveryModal
+          open={discoveryModalOpen}
+          onClose={() => setDiscoveryModalOpen(false)}
+          userEmail={authedEmail}
+        />
+      )}
+
+      {/* Settings Saved Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbarOpen(false)} 
+          severity="success" 
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          Settings Saved
+        </Alert>
+      </Snackbar>
+    </>
   );
 }

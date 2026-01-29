@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Box, Button, Card, CardContent, TextField, Typography } from "@mui/material";
 import { supabase } from "@/lib/supabaseClient";
 
-export default function AdminLoginPage() {
+export default function WelcomeLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -28,12 +28,12 @@ export default function AdminLoginPage() {
     // confirm session exists before redirect
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
-      setMsg("Logged in, but session didn’t load. Refresh and try again.");
+      setMsg("Logged in, but session didn't load. Refresh and try again.");
       setLoading(false);
       return;
     }
 
-    window.location.href = "/admin";
+    window.location.href = "/welcome";
   }
 
   return (

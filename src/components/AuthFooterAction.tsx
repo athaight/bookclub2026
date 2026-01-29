@@ -6,10 +6,10 @@ import { Box, Button } from "@mui/material";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
-  loginHref?: string; // default: /admin/login
+  loginHref?: string; // default: /welcome/login
 };
 
-export default function AuthFooterAction({ loginHref = "/admin/login" }: Props) {
+export default function AuthFooterAction({ loginHref = "/welcome/login" }: Props) {
   const [loading, setLoading] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
 
@@ -52,7 +52,7 @@ export default function AuthFooterAction({ loginHref = "/admin/login" }: Props) 
 
   return (
     <Box sx={{ display: "flex", gap: 1 }}>
-      <Button size="small" component={Link} href="/profile" variant="text">
+      <Button size="small" component={Link} href="/admin" variant="text">
         Admin
       </Button>
       <Button
@@ -60,10 +60,10 @@ export default function AuthFooterAction({ loginHref = "/admin/login" }: Props) 
         variant="text"
         onClick={async () => {
           await supabase.auth.signOut({ scope: 'local' });
-          // Bounce to home if on admin or profile page
+          // Bounce to home if on admin or welcome page
           if (typeof window !== "undefined" && 
               (window.location.pathname.startsWith("/admin") || 
-               window.location.pathname.startsWith("/profile"))) {
+               window.location.pathname.startsWith("/welcome"))) {
             window.location.href = "/";
           }
         }}

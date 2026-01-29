@@ -70,7 +70,8 @@ Book Bros is a **full-stack book club app** built entirely through vibe coding w
 - `/book-report` — Book reviews and reports
 - `/book-of-the-month` — Monthly rotating book picks
 - `/profiles` — Member profiles with reading stats
-- `/admin` — Member authentication and management
+- `/welcome` — Welcome page for logged-in members
+- `/admin` — Member settings and preferences
 
 **Notable implementation details:**
 - Book search uses Open Library with Google Books fallback
