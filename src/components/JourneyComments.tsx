@@ -225,7 +225,8 @@ function CommentItem({
               <TextField
                 fullWidth
                 multiline
-                rows={2}
+                minRows={2}
+                maxRows={12}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 size="small"
@@ -723,11 +724,12 @@ export default function JourneyComments({
             </Box>
           )}
           
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
             <TextField
               fullWidth
               multiline
-              rows={2}
+              minRows={2}
+              maxRows={12}
               placeholder={replyingTo ? 'Write a reply... (use @ to mention someone)' : 'Share your thoughts on the journey... (use @ to mention someone)'}
               value={newComment}
               onChange={handleInputChange}
