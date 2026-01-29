@@ -207,7 +207,7 @@ export default function BookOfTheMonthPage() {
         .from("book_of_month_picker_overrides")
         .select("new_picker_email")
         .eq("year_month", selectedMonth)
-        .single();
+        .maybeSingle();
 
       if (!error && data) {
         setPickerOverride(normEmail(data.new_picker_email));

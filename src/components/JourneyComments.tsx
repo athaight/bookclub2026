@@ -673,10 +673,12 @@ export default function JourneyComments({
       <Box
         ref={commentsContainerRef}
         sx={{
-          maxHeight: 1000,
-          minHeight: 150,
-          overflowY: 'auto',
-          pr: 1,
+          // On mobile: no max height, no scroll - let page scroll handle it
+          // On desktop: scrollable with max height
+          maxHeight: { xs: 'none', md: 1000 },
+          minHeight: { xs: 0, md: 150 },
+          overflowY: { xs: 'visible', md: 'auto' },
+          pr: { xs: 0, md: 1 },
           mb: 2,
           borderBottom: '1px solid',
           borderColor: 'divider',
